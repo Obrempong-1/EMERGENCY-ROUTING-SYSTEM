@@ -110,6 +110,7 @@ export default function Home() {
     const [sheetBottom, setSheetBottom] = useState(0);
     const [sheetSnap, setSheetSnap] = useState<SheetSnap>("rest");
     const [phoneView, setPhoneView] = useState<PhoneView>("home");
+    const [mapMoving, setMapMoving] = useState(false);
 
     const { destinationId, route, computedAt, loading, error } = routing;
     const { plan, choose, clear, fail } = routing;
@@ -580,7 +581,36 @@ export default function Home() {
                 </div>
             </aside>
 
-            <div className="relative h-full min-w-0 flex-1">
+            <div className="relative flex h-full min-w-0 flex-1 flex-col">
+                <div className={isDesktop ? "shrink-0 pt-3" : "contents"}>
+                    <TopBar
+                        destinationName={destinationName}
+                        onClear={clear}
+                        transportMode={transportMode}
+                        onModeChange={setTransportMode}
+                        trafficLevel={trafficLevel}
+                        onTrafficChange={setTrafficLevel}
+                        etas={modeEtas}
+                        loading={loading}
+                        inline={isDesktop}
+                        compact={!isDesktop && mapMoving}
+                        onExpand={() => setMapMoving(false)}
+                        onHeightChange={setTopBarBottom}
+                    />
+
+                    <RouteAnalysis
+                        route={route}
+                        transportMode={transportMode}
+                        trafficLevel={trafficLevel}
+                        navigating={gps.watching && usingGps}
+                        inline={isDesktop}
+                        hidden={!isDesktop && mapMoving}
+                        top={topBarBottom + 8}
+                        maxHeight={analysisMaxHeight}
+                    />
+                </div>
+
+                <div className="relative min-h-0 flex-1">
                 <MapComponent
                     locations={mapLocations}
                     activeLocation={activeLocation}
@@ -608,31 +638,12 @@ export default function Home() {
                     }}
                     incidents={incidentsQuery.data?.incidents ?? []}
                     onReportIncident={() => setReportOpen(true)}
-                    topBarBottom={topBarBottom}
+                    onUserMove={setMapMoving}
+                    topBarBottom={isDesktop ? 0 : topBarBottom}
                     sheetBottom={sheetBottom}
                     onContactsOpen={() => setSheetSnap("rest")}
                 />
-
-                <TopBar
-                    destinationName={destinationName}
-                    onClear={clear}
-                    transportMode={transportMode}
-                    onModeChange={setTransportMode}
-                    trafficLevel={trafficLevel}
-                    onTrafficChange={setTrafficLevel}
-                    etas={modeEtas}
-                    loading={loading}
-                    onHeightChange={setTopBarBottom}
-                />
-
-                <RouteAnalysis
-                    route={route}
-                    transportMode={transportMode}
-                    trafficLevel={trafficLevel}
-                    navigating={gps.watching && usingGps}
-                    top={topBarBottom + 8}
-                    maxHeight={analysisMaxHeight}
-                />
+                </div>
 
                 {!sidebarOpen && (
                     <button

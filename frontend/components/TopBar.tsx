@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { Bike, Car, Footprints, X } from "lucide-react";
+import { Bike, Car, ChevronDown, Footprints, X } from "lucide-react";
 
 import type { TrafficLevel, TransportMode } from "../lib/api";
 
@@ -31,12 +31,16 @@ interface Props {
     onTrafficChange: (level: TrafficLevel) => void;
     etas: Record<TransportMode, number | null>;
     loading: boolean;
+    inline: boolean;
+    compact: boolean;
+    onExpand: () => void;
     onHeightChange: (height: number) => void;
 }
 
 export default function TopBar({
     destinationName, onClear, transportMode, onModeChange,
-    trafficLevel, onTrafficChange, etas, loading, onHeightChange,
+    trafficLevel, onTrafficChange, etas, loading, inline, compact, onExpand,
+    onHeightChange,
 }: Props) {
     const barRef = useRef<HTMLDivElement>(null);
     const chosen = Boolean(destinationName);
@@ -60,10 +64,39 @@ export default function TopBar({
 
     if (!chosen) return null;
 
+    if (compact) {
+        const minutes = etas[transportMode];
+        const Active = MODES.find((mode) => mode.value === transportMode)?.Icon ?? Car;
+        return (
+            <div
+                className="pointer-events-none absolute inset-x-0 top-0 z-[680] px-3"
+                style={{ paddingTop: "calc(env(safe-area-inset-top) + 0.75rem)" }}
+            >
+                <button
+                    onClick={onExpand}
+                    aria-label="Show travel options"
+                    className="pointer-events-auto flex items-center gap-2 rounded-full bg-white/95 py-2 pl-3 pr-2.5 shadow-[0_6px_20px_rgba(15,23,42,.2)] ring-1 ring-slate-900/5 backdrop-blur transition active:scale-95"
+                >
+                    <Active size={15} strokeWidth={2.2} className="text-slate-700" />
+                    <span className="text-[12.5px] font-semibold tabular-nums text-slate-900">
+                        {minutes === null || minutes === undefined
+                            ? "\u2026"
+                            : `${minutesLabel(minutes)} min`}
+                    </span>
+                    <ChevronDown size={14} className="text-slate-400" />
+                </button>
+            </div>
+        );
+    }
+
     return (
         <div
-            className="pointer-events-none absolute inset-x-0 top-0 z-[680] px-3 lg:px-4"
-            style={{ paddingTop: "calc(env(safe-area-inset-top) + 0.75rem)" }}
+            className={inline
+                ? "pointer-events-none relative z-[680] w-full px-4"
+                : "pointer-events-none absolute inset-x-0 top-0 z-[680] px-3"}
+            style={inline
+                ? undefined
+                : { paddingTop: "calc(env(safe-area-inset-top) + 0.75rem)" }}
         >
             <div ref={barRef} className="mx-auto w-full max-w-md lg:max-w-lg">
                 <div className="pointer-events-auto rounded-[22px] bg-white p-1.5 shadow-[0_8px_30px_rgba(15,23,42,.22)] ring-1 ring-slate-900/5">

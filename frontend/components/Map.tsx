@@ -20,6 +20,7 @@ import MapTypeButton from './phone/MapTypeButton';
 import ContactsButton from './phone/ContactsButton';
 
 const CENTER: [number, number] = [6.6745, -1.5716];
+const CONTROLS_RETURN_MS = 700;
 const FALLBACK_BOUNDS: L.LatLngBoundsExpression = [[6.65, -1.60], [6.72, -1.52]];
 
 const BASEMAPS = {
@@ -51,6 +52,7 @@ interface MapContentProps {
     incidents: Incident[];
     insetTop: number;
     insetBottom: number;
+    onUserMove?: (moving: boolean) => void;
 }
 
 function MapContent({
@@ -67,10 +69,12 @@ function MapContent({
     incidents,
     insetTop,
     insetBottom,
+    onUserMove,
 }: MapContentProps) {
     const map = useMap();
 
     const insets = useRef({ top: 0, bottom: 0 });
+    const programmatic = useRef(false);
     useEffect(() => {
         insets.current = { top: insetTop, bottom: insetBottom };
     }, [insetTop, insetBottom]);
@@ -109,6 +113,7 @@ function MapContent({
         const { top, bottom } = insets.current;
         const shifted = map.project([focusLat, focusLon], zoom)
             .add([0, (bottom - top) / 2]);
+        programmatic.current = true;
         map.flyTo(map.unproject(shifted, zoom), zoom, { animate: true, duration: 1.1 });
     }, [focusLat, focusLon, map]);
 
@@ -116,6 +121,7 @@ function MapContent({
     useEffect(() => {
         if (map && path && path.length > 1) {
             const { top, bottom } = insets.current;
+            programmatic.current = true;
             map.fitBounds(L.latLngBounds(path as [number, number][]), {
                 paddingTopLeft: [28, top + 56],
                 paddingBottomRight: [28, bottom + 24],
@@ -124,6 +130,32 @@ function MapContent({
             });
         }
     }, [map, path]);
+
+    useEffect(() => {
+        if (!map || !onUserMove) return;
+        let settle: ReturnType<typeof setTimeout> | null = null;
+        const begin = () => {
+            if (programmatic.current) return;
+            if (settle) clearTimeout(settle);
+            onUserMove(true);
+        };
+        const end = () => {
+            programmatic.current = false;
+            if (settle) clearTimeout(settle);
+            settle = setTimeout(() => onUserMove(false), CONTROLS_RETURN_MS);
+        };
+        map.on("dragstart", begin);
+        map.on("zoomstart", begin);
+        map.on("moveend", end);
+        map.on("zoomend", end);
+        return () => {
+            if (settle) clearTimeout(settle);
+            map.off("dragstart", begin);
+            map.off("zoomstart", begin);
+            map.off("moveend", end);
+            map.off("zoomend", end);
+        };
+    }, [map, onUserMove]);
 
     const placed = useMapLabels(map, locations, activeId);
     const tiles = BASEMAPS[basemap];
@@ -340,6 +372,7 @@ interface MapComponentProps {
     onReportIncident: () => void;
     topBarBottom: number;
     sheetBottom: number;
+    onUserMove?: (moving: boolean) => void;
     onContactsOpen?: () => void;
 }
 
@@ -366,6 +399,7 @@ export default function MapComponent({
     onReportIncident,
     topBarBottom,
     sheetBottom,
+    onUserMove,
     onContactsOpen,
 }: MapComponentProps) {
     const [map, setMap] = useState<L.Map | null>(null);
@@ -450,6 +484,7 @@ export default function MapComponent({
                     incidents={incidents}
                     insetTop={topBarBottom}
                     insetBottom={sheetBottom}
+                    onUserMove={onUserMove}
                 />
             </MapContainer>
 

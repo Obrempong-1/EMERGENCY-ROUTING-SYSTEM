@@ -659,8 +659,9 @@ def admin_students(authorization: Optional[str] = Header(default=None),
 
     return {"students": [
         {"id": row[0], "email": row[1],
-         "roles": list(accounts.normalise_roles(row[6])),
-         "role": accounts.primary_role(row[6]), "trust": float(row[3]),
+         "roles": list(accounts.roles_from_record(row[6], row[2])),
+         "role": accounts.primary_role(accounts.roles_from_record(row[6], row[2])),
+         "trust": float(row[3]),
          "knust_verified": bool(row[4]), "created_at": row[5].isoformat(),
          "owner": row[1] in config.ADMIN_EMAILS}
         for row in rows

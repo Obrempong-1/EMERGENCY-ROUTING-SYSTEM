@@ -95,6 +95,34 @@ class TestRoleCombinations(unittest.TestCase):
         self.assertTrue(accounts.may_act_as(held, "student"))
         self.assertFalse(accounts.may_act_as(held, "admin"))
 
+class TestLegacyRoleColumn(unittest.TestCase):
+    """A record whose role lives only in the column roles replaced."""
+
+    def test_legacy_role_is_honoured_when_the_array_is_default(self):
+        self.assertEqual(accounts.roles_from_record(["student"], "security"),
+                         ("student", "security"))
+
+    def test_legacy_role_is_honoured_when_the_array_is_missing(self):
+        self.assertEqual(accounts.roles_from_record(None, "admin"),
+                         ("student", "admin"))
+
+    def test_the_array_wins_when_it_says_more(self):
+        self.assertEqual(accounts.roles_from_record(["student", "mapper"], "student"),
+                         ("student", "mapper"))
+
+    def test_a_plain_student_stays_a_student(self):
+        self.assertEqual(accounts.roles_from_record(["student"], "student"),
+                         ("student",))
+
+    def test_no_legacy_role_changes_nothing(self):
+        self.assertEqual(accounts.roles_from_record(["student", "security"], ""),
+                         ("student", "security"))
+
+    def test_an_unknown_legacy_role_is_ignored(self):
+        self.assertEqual(accounts.roles_from_record(["student"], "wizard"),
+                         ("student",))
+
+
 class TestMayActAs(unittest.TestCase):
     def test_admin_may_act_as_anything(self):
         for role in accounts.ROLES:

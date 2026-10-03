@@ -312,7 +312,7 @@ class TestAdminSetRole(support.SchemaFixture):
         return student_id
 
     def _set(self, student_id, role):
-        return api.admin_set_role(student_id, api.RoleRequest(role=role), None, None)
+        return api.admin_set_role(student_id, api.RoleRequest(roles=[role]), None, None)
 
     def test_admin_can_grant_and_revoke_security(self):
         guard = self._insert("guard@knust.edu.gh")

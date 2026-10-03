@@ -75,12 +75,14 @@ interface RouteAnalysisProps {
     transportMode: TransportMode;
     trafficLevel: TrafficLevel;
     navigating: boolean;
+    inline: boolean;
+    hidden: boolean;
     top: number;
     maxHeight: string;
 }
 
 export default function RouteAnalysis({
-    route, transportMode, trafficLevel, navigating, top, maxHeight,
+    route, transportMode, trafficLevel, navigating, inline, hidden, top, maxHeight,
 }: RouteAnalysisProps) {
     const [open, setOpen] = useState(false);
 
@@ -96,18 +98,20 @@ export default function RouteAnalysis({
             ? action
             : `In ${spokenDistance(toNext)}, ${action.charAt(0).toLowerCase()}${action.slice(1)}`;
 
-    const voice = useVoiceGuidance(phrase, navigating && Boolean(route));
+    const voice = useVoiceGuidance(navigating ? phrase : "", navigating && Boolean(route));
 
-    if (!route) return null;
+    if (!route || hidden) return null;
 
     const congested = transportMode === "drive" && trafficLevel === "heavy";
     const hazards = route.hazards ?? [];
-    const Icon = MANOEUVRE[next?.kind ?? "continue"] ?? ArrowUp;
+    const Icon = navigating ? (MANOEUVRE[next?.kind ?? "continue"] ?? ArrowUp) : Route;
 
     return (
         <div
-            className="pointer-events-none absolute inset-x-0 z-[660] px-3 lg:px-4"
-            style={{ top }}
+            className={inline
+                ? "pointer-events-none relative z-[660] w-full px-4 pt-2"
+                : "pointer-events-none absolute inset-x-0 z-[660] px-3"}
+            style={inline ? undefined : { top }}
         >
             <div className="pointer-events-auto mx-auto w-full max-w-md overflow-hidden rounded-2xl bg-white/95 shadow-[0_8px_30px_rgba(15,23,42,.18)] ring-1 ring-slate-900/5 backdrop-blur lg:max-w-lg">
                 <div className="flex items-center gap-2.5 px-3 py-2.5">
@@ -120,7 +124,7 @@ export default function RouteAnalysis({
                         aria-expanded={open}
                         className="min-w-0 flex-1 text-left"
                     >
-                        {action ? (
+                        {navigating && action ? (
                             <>
                                 {next?.kind !== "arrive" && (
                                     <span className="block text-[10.5px] font-semibold uppercase tracking-[0.1em] text-slate-400">
@@ -132,18 +136,22 @@ export default function RouteAnalysis({
                                 </span>
                             </>
                         ) : (
-                            <span className="block text-[13.5px] font-semibold text-slate-900">
-                                {route.distance_km} km
+                            <span className="block text-[14px] font-semibold leading-tight text-slate-900">
+                                {route.time_min} min
+                                <span className="font-normal text-slate-400">
+                                    {" · "}{route.distance_km} km
+                                </span>
                             </span>
                         )}
                         <span className="mt-0.5 block truncate text-[11px] text-slate-400">
-                            {route.distance_km} km · {steps.length}{" "}
-                            {steps.length === 1 ? "step" : "steps"}
+                            {navigating
+                                ? `${route.distance_km} km · ${steps.length} ${steps.length === 1 ? "step" : "steps"}`
+                                : `${steps.length} ${steps.length === 1 ? "step" : "steps"}`}
                             {congested ? " · heavy traffic" : ""}
                         </span>
                     </button>
 
-                    {voice.supported && (
+                    {navigating && voice.supported && (
                         <button
                             onClick={voice.toggle}
                             aria-pressed={voice.enabled}

@@ -89,12 +89,6 @@ function AdminTools() {
                         </button>
                     ))}
                 </div>
-                {viewing && (
-                    <p className="mt-3 rounded-2xl bg-amber-50 px-4 py-3 text-[12.5px] text-amber-900">
-                        Acting as <strong>{viewing}</strong>. Admin tools are hidden until
-                        you switch back.
-                    </p>
-                )}
             </section>
 
             {viewing === null && (

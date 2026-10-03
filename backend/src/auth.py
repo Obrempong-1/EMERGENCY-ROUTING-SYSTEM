@@ -20,7 +20,7 @@ class AuthError(Exception):
         self.detail = detail
 
 def _student_from_row(row) -> dict:
-    roles = accounts.normalise_roles(row[5] if len(row) > 5 else row[4])
+    roles = accounts.roles_from_record(row[5] if len(row) > 5 else None, row[4])
     return {
         "id": row[0],
         "email": row[1],

@@ -44,6 +44,18 @@ def normalise_roles(value) -> tuple:
     held.add("student")
     return tuple(role for role in ROLES if role in held)
 
+def roles_from_record(stored, legacy_role: str = "") -> tuple:
+    """Reconcile the roles column with the single-role column it replaced.
+
+    A record edited by hand, or written before roles existed, carries the role
+    only in the old column. Trusting it there keeps such an account working.
+    """
+    held = normalise_roles(stored)
+    if legacy_role and legacy_role != "student" and held == ("student",):
+        return normalise_roles([legacy_role])
+    return held
+
+
 def capabilities(value) -> frozenset:
     """Everything the held roles allow between them."""
     granted = set()
