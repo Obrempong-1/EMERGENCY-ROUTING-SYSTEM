@@ -1,0 +1,39 @@
+name: Keep Supabase awake
+
+
+
+on:
+  schedule:
+    - cron: "17 6 */2 * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: pip install "psycopg[binary]>=3.1"
+
+      - name: Touch the database
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        shell: python
+        run: |
+          import os, sys
+          from urllib.parse import urlsplit
+          import psycopg
+
+          url = os.environ.get("DATABASE_URL", "").strip()
+          if not url:
+              sys.exit("DATABASE_URL secret is not set")
+
+          # Supabase's transaction pooler (port 6543) cannot use prepared statements.
+          kwargs = {"prepare_threshold": None} if urlsplit(url).port == 6543 else {}
+          with psycopg.connect(url, connect_timeout=20, **kwargs) as conn:
+              moment, students = conn.execute(
+                  "SELECT now(), count(*) FROM students").fetchone()
+          print(f"awake at {moment.isoformat()} with {students} student(s) registered")

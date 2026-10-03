@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: knust-gis-api
+    runtime: python
+    plan: free
+    region: frankfurt
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: uvicorn api:app --app-dir backend/src --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: ENV
+        value: production
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: CAMPUS_SECURITY_PHONE
+        sync: false
+      - key: CAMPUS_SECURITY_LABEL
+        value: KNUST Security
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: ADMIN_EMAILS
+        sync: false

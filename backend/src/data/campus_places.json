@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "places": [],
+  "overrides": [
+    {
+      "match": { "osm_id": "way/335945454" },
+      "category": "administration",
+      "type": "administration"
+    },
+    {
+      "match": { "osm_id": "way/1125035005" },
+      "category": "security",
+      "type": "security_office"
+    },
+    {
+      "match": { "osm_id": "way/1197826348" },
+      "category": "security",
+      "type": "security_post"
+    },
+    {
+      "match": { "osm_id": "node/3820432316" },
+      "category": "security",
+      "type": "security_checkpoint"
+    },
+    {
+      "match": { "osm_id": "way/336069053" },
+      "category": "student_services",
+      "type": "disability_services"
+    }
+  ],
+  "exclude": []
+}

@@ -1,0 +1,218 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #0f172a;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+}
+
+html,
+body {
+  height: 100%;
+  background: var(--background);
+  color: var(--foreground);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-size-adjust: 100%;
+}
+
+body {
+  overscroll-behavior: none;
+}
+
+.leaflet-container {
+  background: #0b1220;
+}
+
+.leaflet-tile {
+  mix-blend-mode: normal;
+}
+
+.knust-pin,
+.knust-dot,
+.knust-label,
+.knust-puck {
+  background: transparent;
+  border: 0;
+}
+
+.knust-pin__inner {
+  display: block;
+  filter: drop-shadow(0 3px 5px rgba(15, 23, 42, 0.35));
+  transform-origin: 50% 100%;
+  animation: pin-drop 0.28s cubic-bezier(0.22, 1.2, 0.36, 1);
+  transition: transform 0.18s cubic-bezier(0.22, 1.2, 0.36, 1);
+}
+
+.knust-pin__inner.is-active {
+  filter: drop-shadow(0 6px 10px rgba(15, 23, 42, 0.45));
+}
+
+.leaflet-marker-icon:hover .knust-pin__inner {
+  transform: translateY(-2px) scale(1.06);
+}
+
+@keyframes pin-drop {
+  from {
+    transform: translateY(-8px) scale(0.86);
+    opacity: 0;
+  }
+
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+.knust-dot__inner {
+  display: block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #f8fafc;
+  border: 2.5px solid #64748b;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.45);
+  transition: transform 0.16s ease, border-color 0.16s ease;
+}
+
+.knust-dot__inner.is-active {
+  width: 16px;
+  height: 16px;
+  border-color: #0f172a;
+}
+
+.leaflet-marker-icon:hover .knust-dot__inner {
+  transform: scale(1.35);
+  border-color: #0f172a;
+}
+
+.knust-label__text {
+  display: block;
+  width: max-content;
+  max-width: 190px;
+  transform: translateX(-50%);
+  text-align: center;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: 0.01em;
+  color: #ffffff;
+  -webkit-text-stroke: 3px rgba(15, 23, 42, 0.78);
+  paint-order: stroke fill;
+  text-shadow: 0 1px 2px rgba(15, 23, 42, 0.55);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+.knust-label__text.is-emphasis {
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.knust-puck {
+  position: relative;
+}
+
+.knust-puck__core {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  background: #2563eb;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.4);
+  z-index: 2;
+}
+
+.knust-puck__pulse {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 44px;
+  height: 44px;
+  margin: -22px 0 0 -22px;
+  background: rgba(37, 99, 235, 0.3);
+  border-radius: 50%;
+  z-index: 1;
+  animation: puck-pulse 2.2s cubic-bezier(0.455, 0.03, 0.515, 0.955) infinite;
+}
+
+@keyframes puck-pulse {
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+
+  45% {
+    opacity: 0.9;
+  }
+
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+.knust-popup .leaflet-popup-content-wrapper {
+  border-radius: 18px;
+  padding: 10px;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.22);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.knust-popup .leaflet-popup-content {
+  margin: 0;
+  width: auto !important;
+}
+
+.knust-popup .leaflet-popup-tip {
+  box-shadow: none;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #cbd5e1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  .knust-pin__inner,
+  .knust-puck__pulse {
+    animation: none;
+  }
+}
+
+.knust-incident {
+    background: none;
+    border: none;
+}
+
+.knust-incident__inner {
+    filter: drop-shadow(0 2px 4px rgb(0 0 0 / 0.3));
+    transition: transform .15s ease;
+}
+
+.knust-incident__inner:hover {
+    transform: scale(1.12);
+}
