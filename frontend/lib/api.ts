@@ -22,6 +22,7 @@ export interface MapMarker {
     phone?: string | null;
     opening_hours?: string | null;
     description?: string | null;
+    on_campus?: boolean;
 }
 
 export interface Facility extends MapMarker {
@@ -61,7 +62,7 @@ export interface RouteResponse {
     hazards?: RouteHazard[];
 }
 
-export interface RouteHazard {
+interface RouteHazard {
     id: number;
     kind: string;
     label: string;

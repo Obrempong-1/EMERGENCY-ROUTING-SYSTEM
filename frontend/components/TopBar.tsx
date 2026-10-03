@@ -30,6 +30,7 @@ interface Props {
     trafficLevel: TrafficLevel;
     onTrafficChange: (level: TrafficLevel) => void;
     etas: Record<TransportMode, number | null>;
+    routeMinutes: number | null;
     loading: boolean;
     inline: boolean;
     compact: boolean;
@@ -39,9 +40,11 @@ interface Props {
 
 export default function TopBar({
     destinationName, onClear, transportMode, onModeChange,
-    trafficLevel, onTrafficChange, etas, loading, inline, compact, onExpand,
-    onHeightChange,
+    trafficLevel, onTrafficChange, etas, routeMinutes, loading, inline, compact,
+    onExpand, onHeightChange,
 }: Props) {
+    const minutesFor = (mode: TransportMode) =>
+        mode === transportMode && routeMinutes !== null ? routeMinutes : etas[mode];
     const barRef = useRef<HTMLDivElement>(null);
     const chosen = Boolean(destinationName);
     const driving = transportMode === "drive";
@@ -65,7 +68,7 @@ export default function TopBar({
     if (!chosen) return null;
 
     if (compact) {
-        const minutes = etas[transportMode];
+        const minutes = minutesFor(transportMode);
         const Active = MODES.find((mode) => mode.value === transportMode)?.Icon ?? Car;
         return (
             <div
@@ -103,7 +106,7 @@ export default function TopBar({
                     <div role="group" aria-label="Travel mode" className="flex items-stretch gap-1">
                         {MODES.map(({ value, label, Icon }) => {
                             const active = transportMode === value;
-                            const minutes = etas[value];
+                            const minutes = minutesFor(value);
                             return (
                                 <button
                                     key={value}

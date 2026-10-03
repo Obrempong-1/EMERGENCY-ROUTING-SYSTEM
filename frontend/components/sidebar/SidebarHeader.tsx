@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 
 import type { MapMarker } from "../../lib/api";
 import { styleFor } from "../map/categories";
+import { campusFirst } from "../../lib/placeOrder";
 
 interface SidebarHeaderProps {
     locations: MapMarker[];
@@ -17,7 +18,8 @@ export default function SidebarHeader({ locations, onLocationSelect, onCollapse 
 
     const needle = query.trim().toLowerCase();
     const results = needle.length > 1
-        ? locations.filter((loc) => loc.name.toLowerCase().includes(needle)).slice(0, 6)
+        ? campusFirst(locations.filter((loc) => loc.name.toLowerCase().includes(needle)))
+            .slice(0, 6)
         : [];
 
     useEffect(() => {
@@ -76,7 +78,7 @@ export default function SidebarHeader({ locations, onLocationSelect, onCollapse 
                     onFocus={() => setOpen(true)}
                     placeholder="Search places"
                     aria-label="Search places on and near campus"
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50/70 py-3 pl-10 pr-9 text-[13.5px] text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50/70 py-3 pl-10 pr-9 text-[16px] lg:text-[13.5px] text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
                 />
                 {query && (
                     <button

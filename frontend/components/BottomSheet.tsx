@@ -7,18 +7,21 @@ export type SheetSnap = 'rest' | 'list';
 const LIST_VH = 72;
 const ORDER: SheetSnap[] = ['rest', 'list'];
 const DRAG_THRESHOLD_PX = 44;
+const SETTLE_FRAMES = 3;
+const SETTLE_CAP_MS = 2000;
 
 interface BottomSheetProps {
     snap: SheetSnap;
     onSnapChange: (snap: SheetSnap) => void;
     rest: React.ReactNode;
+    footer?: React.ReactNode;
     children: React.ReactNode;
     label?: string;
     onHeightChange?: (height: number) => void;
 }
 
 export default function BottomSheet({
-    snap, onSnapChange, rest, children, label, onHeightChange,
+    snap, onSnapChange, rest, footer, children, label, onHeightChange,
 }: BottomSheetProps) {
     const [dragging, setDragging] = useState(false);
     const [dragOffset, setDragOffset] = useState(0);
@@ -60,12 +63,23 @@ export default function BottomSheet({
     }, [onHeightChange, report]);
 
     useLayoutEffect(() => {
-        if (!onHeightChange) return;
+        const node = sheetRef.current;
+        if (!node || !onHeightChange) return;
         let frame = 0;
-        const tick = () => { report(); frame = requestAnimationFrame(tick); };
+        let steady = 0;
+        let last = -1;
+        const started = Date.now();
+        const tick = () => {
+            report();
+            const top = Math.round(node.getBoundingClientRect().top);
+            steady = top === last ? steady + 1 : 0;
+            last = top;
+            if (!dragging && (steady >= SETTLE_FRAMES
+                              || Date.now() - started > SETTLE_CAP_MS)) return;
+            frame = requestAnimationFrame(tick);
+        };
         frame = requestAnimationFrame(tick);
-        const stop = setTimeout(() => cancelAnimationFrame(frame), dragging ? 60_000 : 420);
-        return () => { cancelAnimationFrame(frame); clearTimeout(stop); };
+        return () => cancelAnimationFrame(frame);
     }, [dragging, snap, onHeightChange, report]);
 
     const endDrag = useCallback((delta: number) => {
@@ -151,6 +165,8 @@ export default function BottomSheet({
             >
                 {children}
             </div>
+
+            {footer && !collapsed && <div className="shrink-0">{footer}</div>}
         </section>
     );
 }

@@ -8,6 +8,7 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from osm import geometry
 from osm.geometry import local_scale, ring_centroid
 from osm.parse import facilities, index_nodes, road_segments
 from routing.builder import build_route_graph
@@ -187,3 +188,38 @@ class TestFacilities(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+class TestCampusMembership(unittest.TestCase):
+    def setUp(self):
+        self.square = [(0.0, 0.0), (0.0, 1.0), (1.0, 1.0), (1.0, 0.0)]
+
+    def test_point_inside_is_inside(self):
+        self.assertTrue(geometry.point_in_ring(0.5, 0.5, self.square))
+
+    def test_point_outside_is_outside(self):
+        self.assertFalse(geometry.point_in_ring(1.5, 0.5, self.square))
+        self.assertFalse(geometry.point_in_ring(0.5, -0.5, self.square))
+
+    def test_point_on_an_edge_counts_as_inside(self):
+        self.assertTrue(geometry.point_in_ring(0.5, 0.0, self.square))
+
+    def test_a_ring_with_too_few_points_contains_nothing(self):
+        self.assertFalse(geometry.point_in_ring(0.0, 0.0, [(0.0, 0.0), (1.0, 1.0)]))
+
+    def test_an_open_ring_is_closed_for_the_test(self):
+        self.assertTrue(geometry.point_in_ring(0.5, 0.5, self.square[:4]))
+
+    def test_concave_shape_excludes_the_notch(self):
+        notched = [(0.0, 0.0), (0.0, 2.0), (2.0, 2.0), (2.0, 0.0),
+                   (1.5, 0.0), (1.5, 1.5), (0.5, 1.5), (0.5, 0.0)]
+        self.assertTrue(geometry.point_in_ring(0.25, 1.0, notched))
+        self.assertFalse(geometry.point_in_ring(1.0, 0.25, notched))
+
+    def test_area_is_positive_whichever_way_the_ring_winds(self):
+        self.assertGreater(geometry.ring_area(self.square), 0)
+        self.assertAlmostEqual(geometry.ring_area(self.square),
+                               geometry.ring_area(list(reversed(self.square))), places=3)
+
+    def test_a_degenerate_ring_has_no_area(self):
+        self.assertEqual(geometry.ring_area([(0.0, 0.0), (1.0, 1.0)]), 0.0)

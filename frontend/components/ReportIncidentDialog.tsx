@@ -157,7 +157,7 @@ export default function ReportIncidentDialog({
                             maxLength={280}
                             rows={2}
                             placeholder="Anything useful to add? (optional)"
-                            className="mt-3 w-full resize-none rounded-2xl bg-slate-50 px-4 py-3 text-[13.5px] text-slate-900 outline-none ring-1 ring-slate-200 transition focus:ring-2 focus:ring-red-500"
+                            className="mt-3 w-full resize-none rounded-2xl bg-slate-50 px-4 py-3 text-[16px] lg:text-[13.5px] text-slate-900 outline-none ring-1 ring-slate-200 transition focus:ring-2 focus:ring-red-500"
                         />
 
                         {point && (
@@ -172,7 +172,8 @@ export default function ReportIncidentDialog({
                             <p role="alert" className="mt-3 flex items-start gap-2 rounded-2xl bg-amber-50 px-3.5 py-3 text-[12px] text-amber-900">
                                 <AlertTriangle size={14} className="mt-px shrink-0" />
                                 You are outside the KNUST area, so you cannot report from
-                                here. Reports must come from where the hazard is.
+                                here. Reports must come from the scene. If this is on
+                                campus, report it when you get there — or call 112 now.
                             </p>
                         )}
 

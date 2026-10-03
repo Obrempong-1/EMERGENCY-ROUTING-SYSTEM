@@ -103,3 +103,16 @@ def features_around(lat: float, lon: float, radius_m: int, keys: tuple) -> str:
         f"(._;>;);\n"
         f"out body;"
     )
+
+
+def campus_boundary(lat: float, lon: float, radius_m: int) -> str:
+    """QL for the university outline around a point, with its nodes."""
+    return (
+        f"[out:json][timeout:{TIMEOUT_S}];\n"
+        f"(\n"
+        f'  way["amenity"="university"](around:{radius_m},{lat},{lon});\n'
+        f'  relation["amenity"="university"](around:{radius_m},{lat},{lon});\n'
+        f");\n"
+        f"(._;>;);\n"
+        f"out body;"
+    )

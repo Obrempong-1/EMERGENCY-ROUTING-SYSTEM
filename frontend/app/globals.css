@@ -216,3 +216,10 @@ body {
 .knust-incident__inner:hover {
     transform: scale(1.12);
 }
+
+button,
+a,
+[role="button"],
+summary {
+    touch-action: manipulation;
+}

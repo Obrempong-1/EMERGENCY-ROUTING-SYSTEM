@@ -3,6 +3,7 @@ import React from "react";
 
 import type { MapMarker } from "../../lib/api";
 import PlacePicker from "./PlacePicker";
+import { campusFirst } from "../../lib/placeOrder";
 
 interface RouteStopsProps {
     title: string;
@@ -28,7 +29,7 @@ export const RouteStops = React.memo(function RouteStops({
     showDestinationPicker = true, onSwap,
 }: RouteStopsProps) {
     const options = React.useMemo(
-        () => [...locations].sort((a, b) => a.name.localeCompare(b.name)),
+        () => campusFirst(locations),
         [locations],
     );
 

@@ -101,7 +101,9 @@ export default function EmergencyPicker({
             : null;
         return [...(byCategory.get(active) ?? [])]
             .filter((place) => !wanted || wanted.has(place.type))
-            .sort((a, b) => a.name.localeCompare(b.name));
+            .sort((a, b) => (a.on_campus === b.on_campus
+                ? a.name.localeCompare(b.name)
+                : a.on_campus ? -1 : 1));
     }, [active, byCategory, subtype, subtypes]);
 
     const rows: (NearestResult | MapMarker)[] =

@@ -49,3 +49,39 @@ def _vertex_mean(points: Sequence[tuple[float, float]]) -> tuple[float, float]:
         raise ValueError("cannot take the centroid of an empty geometry")
     return (sum(p[0] for p in unique) / len(unique),
             sum(p[1] for p in unique) / len(unique))
+
+
+def point_in_ring(lat: float, lon: float, ring: Sequence[tuple[float, float]]) -> bool:
+    """Ray casting. A point exactly on an edge counts as inside."""
+    points = _closed(ring)
+    if len(points) < 4:
+        return False
+    inside = False
+    for index in range(len(points) - 1):
+        y1, x1 = points[index]
+        y2, x2 = points[index + 1]
+        if (y1 > lat) != (y2 > lat):
+            span = y2 - y1
+            if span == 0:
+                continue
+            crossing = x1 + (lat - y1) * (x2 - x1) / span
+            if crossing == lon:
+                return True
+            if crossing > lon:
+                inside = not inside
+    return inside
+
+
+def ring_area(points: Sequence[tuple[float, float]]) -> float:
+    """Unsigned area in square metres, for choosing the largest of several rings."""
+    closed = _closed(points)
+    if len(closed) < 4:
+        return 0.0
+    mean_lat = sum(point[0] for point in closed[:-1]) / (len(closed) - 1)
+    lat_m, lon_m = local_scale(mean_lat)
+    total = 0.0
+    for index in range(len(closed) - 1):
+        y1, x1 = closed[index]
+        y2, x2 = closed[index + 1]
+        total += (x1 * lon_m) * (y2 * lat_m) - (x2 * lon_m) * (y1 * lat_m)
+    return abs(total) / 2.0

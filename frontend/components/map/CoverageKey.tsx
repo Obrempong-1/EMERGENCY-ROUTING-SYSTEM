@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from 'react';
-import { Radar } from 'lucide-react';
+import { Radar, X } from 'lucide-react';
 
 import type { CoverageResponse, TransportMode } from '@/lib/api';
 import { COVERAGE_SCOPES, coverageColor, type CoverageScope } from './coverage';
@@ -19,10 +19,11 @@ interface CoverageKeyProps {
     onScopeChange: (scope: CoverageScope) => void;
     mode: TransportMode;
     onModeChange: (mode: TransportMode) => void;
+    onClose: () => void;
 }
 
 export default function CoverageKey({
-    coverage, loading, scope, onScopeChange, mode, onModeChange,
+    coverage, loading, scope, onScopeChange, mode, onModeChange, onClose,
 }: CoverageKeyProps) {
     const [shown, setShown] = useState(coverage);
     if (coverage && coverage !== shown) setShown(coverage);
@@ -49,8 +50,15 @@ export default function CoverageKey({
                     Response time
                 </p>
                 {loading && (
-                    <span className="ml-auto text-[10px] font-medium text-slate-400">Updating…</span>
+                    <span className="text-[10px] font-medium text-slate-400">Updating…</span>
                 )}
+                <button
+                    onClick={onClose}
+                    aria-label="Hide the response time map"
+                    className="ml-auto grid h-6 w-6 shrink-0 place-items-center rounded-full bg-slate-900/[0.06] text-slate-500 transition active:scale-90"
+                >
+                    <X size={13} />
+                </button>
             </div>
 
             <div role="group" aria-label="Coverage for" className="mt-2 grid grid-cols-4 rounded-full bg-slate-900/[0.06] p-0.5 lg:mt-3">

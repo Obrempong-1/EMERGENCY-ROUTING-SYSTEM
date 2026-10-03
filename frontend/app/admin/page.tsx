@@ -106,7 +106,7 @@ function AdminTools() {
                                     onChange={(event) => setSearch(event.target.value)}
                                     placeholder="Search by email"
                                     aria-label="Search accounts by email"
-                                    className="w-full rounded-xl bg-slate-50 py-2 pl-8 pr-3 text-[12.5px] text-slate-800 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-blue-500/40"
+                                    className="w-full rounded-xl bg-slate-50 py-2 pl-8 pr-3 text-[16px] lg:text-[12.5px] text-slate-800 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-blue-500/40"
                                 />
                             </label>
                         </div>

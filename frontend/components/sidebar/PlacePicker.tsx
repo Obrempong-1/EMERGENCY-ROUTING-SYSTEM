@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { Check, ChevronDown, Search } from "lucide-react";
 
 import type { MapMarker } from "@/lib/api";
 import { styleFor } from "../map/categories";
 import { CategoryGlyph } from "../map/CategoryGlyph";
+import { groupLabel } from "../../lib/placeOrder";
 
 export interface PickerProps {
     label: string;
@@ -98,18 +99,25 @@ export default function PlacePicker({
                             value={query}
                             onChange={(event) => setQuery(event.target.value)}
                             placeholder="Filter places..."
-                            className="w-full rounded-xl bg-slate-50 py-2.5 pl-9 pr-3 text-[12.5px] text-slate-700 outline-none placeholder:text-slate-400 focus:ring-2 focus:ring-blue-500/20"
+                            className="w-full rounded-xl bg-slate-50 py-2.5 pl-9 pr-3 text-[16px] lg:text-[12.5px] text-slate-700 outline-none placeholder:text-slate-400 focus:ring-2 focus:ring-blue-500/20"
                         />
                     </div>
                 </div>
 
                 <div className="custom-scrollbar max-h-60 overflow-y-auto p-1.5">
-                    {filtered.slice(0, 200).map((opt) => {
+                    {filtered.slice(0, 200).map((opt, index, shown) => {
                         const style = styleFor(opt.category);
                         const selected = selectedId === opt.id;
+                        const heading = index === 0
+                            || Boolean(shown[index - 1].on_campus) !== Boolean(opt.on_campus);
                         return (
+                            <Fragment key={opt.id}>
+                            {heading && (
+                                <p className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                                    {groupLabel(opt)}
+                                </p>
+                            )}
                             <button
-                                key={opt.id}
                                 type="button"
                                 role="option"
                                 aria-selected={selected}
@@ -136,6 +144,7 @@ export default function PlacePicker({
                                 </span>
                                 {selected && <Check size={14} className="shrink-0 text-blue-600" />}
                             </button>
+                            </Fragment>
                         );
                     })}
                     {filtered.length === 0 && (

@@ -14,7 +14,7 @@ interface SignInFormProps {
     intro: string;
 }
 
-const FIELD = "w-full rounded-2xl bg-slate-50 px-4 py-3.5 text-[15px] text-slate-900 outline-none ring-1 ring-slate-200 transition focus:ring-2 focus:ring-red-500";
+const FIELD = "w-full rounded-2xl bg-slate-50 px-4 py-3.5 text-[16px] lg:text-[15px] text-slate-900 outline-none ring-1 ring-slate-200 transition focus:ring-2 focus:ring-red-500";
 const SUBMIT = "flex w-full items-center justify-center gap-2 rounded-2xl bg-red-600 px-4 py-3.5 text-[14px] font-semibold text-white transition active:scale-[.98] disabled:opacity-50";
 
 export default function SignInForm({ intro }: SignInFormProps) {

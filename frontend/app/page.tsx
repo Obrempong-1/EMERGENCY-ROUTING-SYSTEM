@@ -54,6 +54,7 @@ import MoreSheet, { type MoreRow } from "../components/phone/MoreSheet";
 import { RouteSummary } from "../components/phone/RouteSummary";
 import { useIsDesktop } from "../lib/useBreakpoint";
 import { can } from "../lib/roles";
+import RoleIntroCard from "../components/RoleIntroCard";
 import { metresBetween } from "../lib/geo";
 import { styleFor } from "../components/map/categories";
 import { scopeCategories, type CoverageScope } from "../components/map/coverage";
@@ -344,6 +345,14 @@ export default function Home() {
                     <ModeTabs value={panelMode} onChange={setPanelMode} />
                 </div>
 
+                <div className="-mx-5 lg:-mx-6">
+                    <RoleIntroCard
+                        roles={sessionRoles}
+                        onAddPlace={() => { setPinPoint(null); setPinOpen(true); }}
+                        onReport={() => setReportOpen(true)}
+                    />
+                </div>
+
                 <RouteStops
                     title={panelMode === "emergency" ? "Where are you?" : "Route"}
                     locations={locations}
@@ -464,6 +473,14 @@ export default function Home() {
             {phoneView === "search" && backRow("Search for a place")}
             {phoneView === "directions" && backRow("Directions")}
 
+            {phoneView === "home" && (
+                <RoleIntroCard
+                    roles={sessionRoles}
+                    onAddPlace={() => { setPinPoint(null); setPinOpen(true); }}
+                    onReport={() => setReportOpen(true)}
+                />
+            )}
+
             {phoneView === "home" && (route
                 ? <RouteSummary
                     route={route}
@@ -503,14 +520,7 @@ export default function Home() {
     );
 
     const phoneBody = (() => {
-        if (phoneView === "more") {
-            return (
-                <>
-                    <MoreSheet rows={moreRows} />
-                    <CreatorFooter />
-                </>
-            );
-        }
+        if (phoneView === "more") return <MoreSheet rows={moreRows} />;
         if (phoneView === "search") {
             return (
                 <div className="px-5 pb-6 pt-1">
@@ -619,6 +629,7 @@ export default function Home() {
                         trafficLevel={trafficLevel}
                         onTrafficChange={setTrafficLevel}
                         etas={modeEtas}
+                        routeMinutes={route?.time_min ?? null}
                         loading={loading}
                         inline={isDesktop}
                         compact={!isDesktop && mapMoving}
@@ -694,6 +705,7 @@ export default function Home() {
                     label="Emergency panel"
                     onHeightChange={setSheetBottom}
                     rest={phoneRest}
+                    footer={phoneView === "more" ? <CreatorFooter /> : null}
                 >
                     {phoneBody}
                 </BottomSheet>

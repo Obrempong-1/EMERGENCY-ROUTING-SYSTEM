@@ -21,6 +21,7 @@ import ContactsButton from './phone/ContactsButton';
 
 const CENTER: [number, number] = [6.6745, -1.5716];
 const CONTROLS_RETURN_MS = 700;
+const CONTROLS_WATCHDOG_MS = 2500;
 const FALLBACK_BOUNDS: L.LatLngBoundsExpression = [[6.65, -1.60], [6.72, -1.52]];
 
 const BASEMAPS = {
@@ -134,24 +135,38 @@ function MapContent({
     useEffect(() => {
         if (!map || !onUserMove) return;
         let settle: ReturnType<typeof setTimeout> | null = null;
+        let watchdog: ReturnType<typeof setTimeout> | null = null;
+        const clear = () => {
+            if (settle) clearTimeout(settle);
+            if (watchdog) clearTimeout(watchdog);
+            settle = null;
+            watchdog = null;
+        };
+        const restore = () => {
+            clear();
+            onUserMove(false);
+        };
         const begin = () => {
             if (programmatic.current) return;
-            if (settle) clearTimeout(settle);
+            clear();
             onUserMove(true);
+            watchdog = setTimeout(restore, CONTROLS_WATCHDOG_MS);
         };
         const end = () => {
             programmatic.current = false;
-            if (settle) clearTimeout(settle);
-            settle = setTimeout(() => onUserMove(false), CONTROLS_RETURN_MS);
+            clear();
+            settle = setTimeout(restore, CONTROLS_RETURN_MS);
         };
         map.on("dragstart", begin);
         map.on("zoomstart", begin);
+        map.on("dragend", end);
         map.on("moveend", end);
         map.on("zoomend", end);
         return () => {
-            if (settle) clearTimeout(settle);
+            clear();
             map.off("dragstart", begin);
             map.off("zoomstart", begin);
+            map.off("dragend", end);
             map.off("moveend", end);
             map.off("zoomend", end);
         };
@@ -604,6 +619,7 @@ export default function MapComponent({
                     loading={coverageLoading}
                     scope={coverageScope}
                     onScopeChange={onCoverageScopeChange}
+                    onClose={onToggleCoverage}
                 />
                 <ContactsButton onOpen={onContactsOpen} />
                 <MapTypeButton

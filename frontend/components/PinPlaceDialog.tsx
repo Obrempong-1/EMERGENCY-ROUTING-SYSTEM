@@ -135,7 +135,7 @@ export default function PinPlaceDialog({
                     onChange={(event) => setName(event.target.value)}
                     onKeyDown={(event) => { if (event.key === "Enter") submit(); }}
                     placeholder="J. Harper Building"
-                    className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-slate-50/70 px-3.5 py-3 text-[13.5px] outline-none focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
+                    className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-slate-50/70 px-3.5 py-3 text-[16px] lg:text-[13.5px] outline-none focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
                 />
 
                 <label className="mt-4 block text-[11px] font-semibold uppercase tracking-wider text-slate-400">
