@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { MapPin, X } from "lucide-react";
+import { Crosshair, Loader2, MapPin, X } from "lucide-react";
 
 import {
     errorMessage,
@@ -12,16 +12,26 @@ import {
 import { useCreatePlace } from "../lib/queries";
 import { styleFor } from "./map/categories";
 
+type Coords = { lat: number; lon: number };
+type Source = "picked" | "gps";
+
 interface PinPlaceDialogProps {
-    point: { lat: number; lon: number };
+    picked: Coords | null;
+    userLocation: Coords | null;
+    locating: boolean;
+    outside: boolean;
+    onRequestLocation: () => void;
     categories: CategorySummary[];
     onCancel: () => void;
     onCreated: (place: Facility) => void;
 }
 
 export default function PinPlaceDialog({
-    point, categories, onCancel, onCreated,
+    picked, userLocation, locating, outside, onRequestLocation,
+    categories, onCancel, onCreated,
 }: PinPlaceDialogProps) {
+    const [source, setSource] = useState<Source>(picked ? "picked" : "gps");
+    const point = source === "picked" ? picked : userLocation;
     const [name, setName] = useState("");
     const [category, setCategory] = useState<EmergencyCategory>(
         categories[0]?.category ?? "student_services");
@@ -38,7 +48,7 @@ export default function PinPlaceDialog({
     }, [onCancel]);
 
     const submit = async () => {
-        if (!name.trim() || saving) return;
+        if (!name.trim() || saving || !point) return;
         setError("");
         try {
             const result = await createPlace.mutateAsync({
@@ -66,7 +76,9 @@ export default function PinPlaceDialog({
                         <div>
                             <h2 className="text-[15px] font-semibold text-slate-900">Add a place</h2>
                             <p className="text-[11px] text-slate-500">
-                                {point.lat.toFixed(5)}, {point.lon.toFixed(5)}
+                                {point
+                                    ? `${point.lat.toFixed(5)}, ${point.lon.toFixed(5)}`
+                                    : "No position yet"}
                             </p>
                         </div>
                     </div>
@@ -75,6 +87,44 @@ export default function PinPlaceDialog({
                         <X size={15} />
                     </button>
                 </div>
+
+                <p className="mt-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                    Where is it?
+                </p>
+                <div role="group" aria-label="Where is it" className="mt-1.5 grid grid-cols-2 gap-1.5 rounded-2xl bg-slate-100 p-1">
+                    <button
+                        onClick={() => setSource("picked")}
+                        aria-pressed={source === "picked"}
+                        disabled={!picked}
+                        className={`flex items-center justify-center gap-1.5 rounded-xl py-2 text-[12px] font-semibold transition disabled:opacity-40 ${
+                            source === "picked" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
+                        }`}
+                    >
+                        <MapPin size={13} /> On the map
+                    </button>
+                    <button
+                        onClick={() => {
+                            setSource("gps");
+                            if (!userLocation) onRequestLocation();
+                        }}
+                        aria-pressed={source === "gps"}
+                        className={`flex items-center justify-center gap-1.5 rounded-xl py-2 text-[12px] font-semibold transition ${
+                            source === "gps" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
+                        }`}
+                    >
+                        <Crosshair size={13} /> Where I am
+                    </button>
+                </div>
+
+                {source === "gps" && !userLocation && (
+                    <p className="mt-2 flex items-start gap-2 rounded-2xl bg-amber-50 px-3.5 py-2.5 text-[12px] text-amber-900">
+                        {locating
+                            ? <><Loader2 size={13} className="mt-px shrink-0 animate-spin" /> Finding where you are…</>
+                            : outside
+                                ? <span>You are outside the mapped area, so your position cannot be used here.</span>
+                                : <span>Location is off. Turn it on, or pick the spot on the map instead.</span>}
+                    </p>
+                )}
 
                 <label className="mt-4 block text-[11px] font-semibold uppercase tracking-wider text-slate-400">
                     Name
@@ -119,7 +169,7 @@ export default function PinPlaceDialog({
 
                 <button
                     onClick={submit}
-                    disabled={!name.trim() || saving}
+                    disabled={!name.trim() || saving || !point}
                     className="mt-4 w-full rounded-2xl bg-slate-900 py-3.5 text-[13px] font-semibold text-white transition active:scale-[.99] disabled:bg-slate-300"
                 >
                     {saving ? "Saving…" : "Save place"}

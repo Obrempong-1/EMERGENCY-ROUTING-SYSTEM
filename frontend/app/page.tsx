@@ -7,6 +7,7 @@ import {
     ChevronLeft,
     ChevronRight,
     MapPin,
+    MapPinPlus,
     PanelLeftOpen,
     Radar,
     Route,
@@ -104,6 +105,7 @@ export default function Home() {
     const plannedFrom = useRef<{ lat: number; lon: number } | null>(null);
     const originRef = useRef<{ lat: number; lon: number } | null>(null);
     const [pinPoint, setPinPoint] = useState<{ lat: number; lon: number } | null>(null);
+    const [pinOpen, setPinOpen] = useState(false);
     const [reportOpen, setReportOpen] = useState(false);
 
     const [topBarBottom, setTopBarBottom] = useState(0);
@@ -310,6 +312,16 @@ export default function Home() {
                 onSelect: () => pickCategory(entry.category),
             })),
         ];
+        if (canAddPlaces) {
+            rows.push({
+                id: "add-place", label: "Add a place", Icon: MapPinPlus,
+                hint: "Use where you are, or pick a spot on the map",
+                onSelect: () => {
+                    setPinPoint(null);
+                    setPinOpen(true);
+                },
+            });
+        }
         if (canResolve) {
             rows.push({
                 id: "security", label: "Incident queue", Icon: ShieldAlert,
@@ -323,7 +335,7 @@ export default function Home() {
             });
         }
         return rows;
-    }, [coverageActive, otherCategories, canResolve, isAdmin, pickCategory]);
+    }, [coverageActive, otherCategories, canAddPlaces, canResolve, isAdmin, pickCategory]);
 
     const panel = (
         <div className="flex h-full min-h-0 flex-1 flex-col">
@@ -373,6 +385,22 @@ export default function Home() {
                         <TriangleAlert size={15} className="mt-px shrink-0" />
                         <p className="flex-1">{error || coverageError || locationsError}</p>
                     </div>
+                )}
+
+                {canAddPlaces && (
+                    <button
+                        onClick={() => { setPinPoint(null); setPinOpen(true); }}
+                        className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 px-4 py-3 text-left transition hover:border-slate-300 hover:bg-slate-50"
+                    >
+                        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-slate-900 text-white">
+                            <MapPinPlus size={15} />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                            <span className="block text-[13px] font-semibold text-slate-900">Add a place</span>
+                            <span className="block text-[11px] text-slate-500">Use where you are, or long-press the map</span>
+                        </span>
+                        <ChevronRight size={16} className="shrink-0 text-slate-400" />
+                    </button>
                 )}
 
                 {canResolve && (
@@ -634,7 +662,9 @@ export default function Home() {
                     onCoverageModeChange={setCoverageMode}
                     onCoverageScopeChange={setCoverageScope}
                     onLongPress={(point) => {
-                        if (canAddPlaces) setPinPoint(point);
+                        if (!canAddPlaces) return;
+                        setPinPoint(point);
+                        setPinOpen(true);
                     }}
                     incidents={incidentsQuery.data?.incidents ?? []}
                     onReportIncident={() => setReportOpen(true)}
@@ -678,12 +708,17 @@ export default function Home() {
                 onRequestLocation={gps.request}
             />
 
-            {pinPoint && (
+            {pinOpen && (
                 <PinPlaceDialog
-                    point={pinPoint}
+                    picked={pinPoint}
+                    userLocation={userLocation}
+                    locating={gps.status === "locating"}
+                    outside={gps.status === "outside"}
+                    onRequestLocation={gps.request}
                     categories={categories}
-                    onCancel={() => setPinPoint(null)}
+                    onCancel={() => { setPinOpen(false); setPinPoint(null); }}
                     onCreated={(place) => {
+                        setPinOpen(false);
                         setPinPoint(null);
                         choose(place.id);
                     }}
