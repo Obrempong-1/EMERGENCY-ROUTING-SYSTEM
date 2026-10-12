@@ -108,15 +108,24 @@ def _only_reachable(service, locations: list) -> list:
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    try:
-        if db.configured():
+    # The database backs auth and incident reporting, not routing. Set it up on
+    # its own so an unreachable database (e.g. a paused Supabase project) degrades
+    # those features without taking down routing, nearest-facility, and the map.
+    if db.configured():
+        try:
             db.apply_schema()
             logger.info("Database ready")
-        problem = config.auth_misconfigured()
-        if problem:
-            logger.error("Authentication is unavailable: %s", problem)
-        elif db.configured():
-            logger.info("Authentication ready (Supabase project %s)", config.SUPABASE_URL)
+            problem = config.auth_misconfigured()
+            if problem:
+                logger.error("Authentication is unavailable: %s", problem)
+            else:
+                logger.info("Authentication ready (Supabase project %s)", config.SUPABASE_URL)
+        except Exception:
+            logger.exception(
+                "Database setup failed; auth and incident reporting are disabled, "
+                "but routing will still load")
+
+    try:
         logger.info("Loading map data")
         state.routing = RoutingService.from_segments(data_loader.load_segments())
         state.osm_locations = data_loader.load_osm_locations()
