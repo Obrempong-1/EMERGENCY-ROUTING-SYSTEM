@@ -428,6 +428,16 @@ export default function MapComponent({
         return () => observer.disconnect();
     }, [map]);
 
+    useEffect(() => {
+        if (!map) return;
+        const frame = requestAnimationFrame(() => map.invalidateSize());
+        const settle = setTimeout(() => map.invalidateSize(), 360);
+        return () => {
+            cancelAnimationFrame(frame);
+            clearTimeout(settle);
+        };
+    }, [map, isDesktop]);
+
     const userLocation = locations.find((l) => l.category === 'user');
 
     const requestNavigate = async (destination: MapMarker) => {

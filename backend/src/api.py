@@ -108,9 +108,6 @@ def _only_reachable(service, locations: list) -> list:
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    # The database backs auth and incident reporting, not routing. Set it up on
-    # its own so an unreachable database (e.g. a paused Supabase project) degrades
-    # those features without taking down routing, nearest-facility, and the map.
     if db.configured():
         try:
             db.apply_schema()

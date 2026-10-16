@@ -620,7 +620,7 @@ export default function Home() {
             </aside>
 
             <div className="relative flex h-full min-w-0 flex-1 flex-col">
-                <div className={isDesktop ? "shrink-0 pt-3" : "contents"}>
+                <div className={isDesktop ? "pointer-events-none absolute inset-x-0 top-0 z-[670] pt-3" : "contents"}>
                     <TopBar
                         destinationName={destinationName}
                         onClear={clear}
