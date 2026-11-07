@@ -76,8 +76,9 @@ def status_for(confidence: float, override=None) -> str:
 _COLUMNS = """
 SELECT c.id, c.kind, c.lat, c.lon, c.override, c.created_at, c.expires_at,
        count(r.id),
-       coalesce(sum(s.trust * exp(-(extract(epoch from (now() - r.created_at)) / 60.0)
-                                  / %(half_life)s)), 0)
+       coalesce(sum(s.trust * exp(greatest(
+           -(extract(epoch from (now() - r.created_at)) / 60.0) / %(half_life)s,
+           -700))), 0)
 FROM incident_clusters c
 LEFT JOIN incident_reports r ON r.cluster_id = c.id
 LEFT JOIN students s ON s.id = r.student_id
