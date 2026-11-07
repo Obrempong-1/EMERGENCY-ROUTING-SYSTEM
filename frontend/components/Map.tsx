@@ -58,6 +58,7 @@ interface MapContentProps {
     onUserMove?: (moving: boolean) => void;
     userHeading: number | null;
     userAccuracy: number | null;
+    tripKey: string;
 }
 
 function MapContent({
@@ -77,6 +78,7 @@ function MapContent({
     onUserMove,
     userHeading,
     userAccuracy,
+    tripKey,
 }: MapContentProps) {
     const map = useMap();
 
@@ -150,18 +152,19 @@ function MapContent({
     }, [focusLat, focusLon, map]);
 
     const path = routeData?.path;
+    const fittedTrip = useRef<string | null>(null);
     useEffect(() => {
-        if (map && path && path.length > 1) {
-            const { top, bottom } = insets.current;
-            programmatic.current = true;
-            map.fitBounds(L.latLngBounds(path as [number, number][]), {
-                paddingTopLeft: [28, top + 56],
-                paddingBottomRight: [28, bottom + 24],
-                maxZoom: 18,
-                animate: true,
-            });
-        }
-    }, [map, path]);
+        if (!map || !path || path.length < 2 || fittedTrip.current === tripKey) return;
+        fittedTrip.current = tripKey;
+        const { top, bottom } = insets.current;
+        programmatic.current = true;
+        map.fitBounds(L.latLngBounds(path as [number, number][]), {
+            paddingTopLeft: [28, top + 56],
+            paddingBottomRight: [28, bottom + 24],
+            maxZoom: 18,
+            animate: true,
+        });
+    }, [map, path, tripKey]);
 
     useEffect(() => {
         if (!map || !onUserMove) return;
@@ -436,6 +439,7 @@ interface MapComponentProps {
     onContactsOpen?: () => void;
     userHeading?: number | null;
     userAccuracy?: number | null;
+    tripKey: string;
 }
 
 export default function MapComponent({
@@ -465,6 +469,7 @@ export default function MapComponent({
     onContactsOpen,
     userHeading = null,
     userAccuracy = null,
+    tripKey,
 }: MapComponentProps) {
     const [map, setMap] = useState<L.Map | null>(null);
     const [basemap, setBasemap] = useState<BasemapKey>('satellite');
@@ -561,6 +566,7 @@ export default function MapComponent({
                     onUserMove={onUserMove}
                     userHeading={userHeading}
                     userAccuracy={userAccuracy}
+                    tripKey={tripKey}
                 />
             </MapContainer>
 

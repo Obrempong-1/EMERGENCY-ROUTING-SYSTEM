@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useReducer } from "react";
+import { useCallback, useReducer, useRef } from "react";
 
 import {
     api,
@@ -19,6 +19,12 @@ interface Destination extends Coords {
     name?: string;
 }
 
+interface PlanOptions {
+    silent?: boolean;
+    keep?: boolean;
+    heading?: number | null;
+}
+
 interface RoutingState {
     destinationId: string;
     route: RouteResponse | null;
@@ -29,7 +35,7 @@ interface RoutingState {
 
 type Action =
     | { type: "choose"; id: string }
-    | { type: "start" }
+    | { type: "start"; keep: boolean }
     | { type: "resolved"; route: RouteResponse; at: number }
     | { type: "failed"; message: string }
     | { type: "message"; message: string }
@@ -51,7 +57,9 @@ function reducer(state: RoutingState, action: Action): RoutingState {
                 ? state
                 : { ...INITIAL, destinationId: action.id };
         case "start":
-            return { ...state, loading: true, route: null, computedAt: null, error: "" };
+            return action.keep
+                ? { ...state, loading: true, error: "" }
+                : { ...state, loading: true, route: null, computedAt: null, error: "" };
         case "resolved":
             return { ...state, loading: false, route: action.route, computedAt: action.at };
         case "failed":
@@ -67,14 +75,15 @@ function reducer(state: RoutingState, action: Action): RoutingState {
 
 export function useRouting(transportMode: TransportMode, trafficLevel: TrafficLevel) {
     const [state, dispatch] = useReducer(reducer, INITIAL);
+    const latest = useRef(0);
 
     const plan = useCallback(async (
         start: Coords,
         destination: Destination,
-        silent = false,
-        heading: number | null = null,
+        { silent = false, keep = false, heading = null }: PlanOptions = {},
     ) => {
-        if (!silent) dispatch({ type: "start" });
+        const request = ++latest.current;
+        if (!silent) dispatch({ type: "start", keep });
         try {
             const data = await api.calculateRoute({
                 origin_lat: start.lat,
@@ -87,8 +96,10 @@ export function useRouting(transportMode: TransportMode, trafficLevel: TrafficLe
                 destination_name: destination.name ?? null,
                 heading,
             });
+            if (request !== latest.current) return;
             dispatch({ type: "resolved", route: data, at: Date.now() });
         } catch (err) {
+            if (request !== latest.current) return;
             dispatch({ type: "failed", message: errorMessage(err) });
         }
     }, [transportMode, trafficLevel]);

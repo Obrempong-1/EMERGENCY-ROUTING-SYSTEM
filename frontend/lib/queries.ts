@@ -351,6 +351,7 @@ export function useModeEtas(
     const query = useQuery({
         queryKey: ["mode-etas", lat, lon, dLat, dLon, trafficLevel],
         enabled: Boolean(origin && destination),
+        placeholderData: keepPreviousData,
         staleTime: 60_000,
         retry: false,
         queryFn: async () => {

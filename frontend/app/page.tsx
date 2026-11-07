@@ -112,6 +112,7 @@ export default function Home() {
 
     const [centreOn, setCentreOn] = useState<{ lat: number; lon: number } | null>(null);
     const collapsedFor = useRef("");
+    const plannedTrip = useRef("");
     const offRouteFixes = useRef(0);
     const lastReroute = useRef(0);
     const originRef = useRef<{ lat: number; lon: number } | null>(null);
@@ -131,7 +132,7 @@ export default function Home() {
 
     const compass = useCompass(userLocation !== null);
     const { request: requestCompass } = compass;
-    const pointerHeading = gps.travelHeading ?? compass.heading;
+    const pointerHeading = compass.heading ?? gps.travelHeading;
 
     const gpsFailed = gps.status === "denied"
         || gps.status === "unavailable"
@@ -163,6 +164,10 @@ export default function Home() {
         if (!isDesktop && userLocation) setGpsTracking(true);
     }, [isDesktop, userLocation, setGpsTracking]);
 
+    useEffect(() => {
+        if (startId === CURRENT_LOCATION && destinationId) setGpsTracking(true);
+    }, [startId, destinationId, setGpsTracking]);
+
     const navigating = gps.watching && usingGps;
     const navigation = useNavigation(route, userLocation, navigating, currentHeading);
 
@@ -183,7 +188,7 @@ export default function Home() {
             || Date.now() - lastReroute.current < REROUTE_GAP_MS) return;
         offRouteFixes.current = 0;
         lastReroute.current = Date.now();
-        plan(userLocation, end, true, currentHeading());
+        plan(userLocation, end, { silent: true, heading: currentHeading() });
     }, [navigating, navigation, userLocation, destinationId, byId, plan, transportMode,
         gps.accuracy, currentHeading]);
 
@@ -198,7 +203,13 @@ export default function Home() {
         const timer = setTimeout(async () => {
             const start = originRef.current;
             if (!start) return;
-            await plan(start, end, false, usingGps ? currentHeading() : null);
+            const trip = `${startId}|${destinationId}`;
+            const sameTrip = plannedTrip.current === trip;
+            plannedTrip.current = trip;
+            await plan(start, end, {
+                keep: sameTrip,
+                heading: usingGps ? currentHeading() : null,
+            });
             if (collapsedFor.current !== destinationId) {
                 collapsedFor.current = destinationId;
                 setSheetSnap("rest");
@@ -709,8 +720,10 @@ export default function Home() {
                     serviceBounds={bounds}
                     onUserLocationUpdate={() => setOriginId(CURRENT_LOCATION)}
                     onNavigate={(start, destination) => {
+                        setOriginId(CURRENT_LOCATION);
                         choose(destination.id ?? "");
-                        plan(start, destination);
+                        plannedTrip.current = `${CURRENT_LOCATION}|${destination.id ?? ""}`;
+                        plan(start, destination, { heading: currentHeading() });
                         setSheetSnap("rest");
                     }}
                     onRouteError={fail}
@@ -731,6 +744,7 @@ export default function Home() {
                     onReportIncident={() => setReportOpen(true)}
                     onUserMove={setMapMoving}
                     userHeading={pointerHeading}
+                    tripKey={`${startId}|${destinationId}`}
                     userAccuracy={gps.accuracy}
                     topBarBottom={isDesktop ? 0 : topBarBottom}
                     sheetBottom={sheetBottom}
