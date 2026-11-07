@@ -40,6 +40,7 @@ interface RouteRequest {
     transport_mode?: TransportMode;
     traffic_level?: TrafficLevel;
     destination_name?: string | null;
+    heading?: number | null;
 }
 
 export interface RouteStep {
@@ -49,6 +50,8 @@ export interface RouteStep {
         | 'sharp-left' | 'sharp-right';
     distance_m: number;
     road: string;
+    location: [number, number];
+    at_m: number;
 }
 
 export interface RouteResponse {
@@ -277,6 +280,10 @@ export const api = {
 
     me: async (): Promise<{ student: Student | null }> =>
         (await client.get('/auth/me')).data,
+
+    forget: async (): Promise<void> => {
+        await client.post('/auth/forget');
+    },
 
     adminStudents: async (): Promise<{ students: AdminStudent[] }> =>
         (await client.get('/admin/students')).data,

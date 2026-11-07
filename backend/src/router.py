@@ -17,7 +17,8 @@ from routing import (
     make_weight_fn,
 )
 from routing.hazards import HazardMap
-from routing.instructions import build_instructions
+from routing.graph import haversine_m
+from routing.instructions import TURN_AROUND_DEG, build_instructions, heading_change
 from routing.overlay import GraphOverlay
 from routing.snapping import EdgeIndex, Projection, slice_geometry, split_geometry
 from routing.weights import WALK_SPEED_KPH, min_traffic_multiplier, travel_seconds
@@ -28,6 +29,11 @@ _JUNCTION_SNAP_M = 0.5
 _COVERAGE_BANDS = (120.0, 300.0, 600.0, 900.0)
 _COVERAGE_MAX_SECONDS = _COVERAGE_BANDS[-1]
 _FALLBACK_MAX_SPEED_MPS = 25.0
+
+_TURN_AROUND_COST = {
+    "fastest": {"drive": 60.0, "bike": 15.0, "walk": 4.0},
+    "shortest": {"drive": 400.0, "bike": 60.0, "walk": 5.0},
+}
 _SNAP_CANDIDATES = 4
 _MAX_SNAP_ATTEMPTS = 8
 
@@ -86,6 +92,7 @@ class RoutingService:
         algorithm: str = "astar",
         destination_name: Optional[str] = None,
         hazards: Sequence = (),
+        heading: Optional[float] = None,
     ) -> RoutePlan:
         mode_bit = MODE_BITS[transport_mode]
         hazard_map = HazardMap(hazards, self.index)
@@ -106,11 +113,13 @@ class RoutingService:
             source = self._attach_origin(overlay, origin, mode_bit)
             target = self._attach_destination(overlay, destination, mode_bit)
             self._link_if_same_edge(overlay, origin, source, destination, target, mode_bit)
+            search_fn = self._facing(weight_fn, overlay, source, heading,
+                                     _TURN_AROUND_COST[objective][transport_mode])
 
             if algorithm == "dijkstra":
-                attempt = dijkstra(overlay, source, target, weight_fn, mode_bit)
+                attempt = dijkstra(overlay, source, target, search_fn, mode_bit)
             else:
-                attempt = a_star(overlay, source, target, weight_fn, mode_bit, scale)
+                attempt = a_star(overlay, source, target, search_fn, mode_bit, scale)
 
             if attempt.found:
                 result = attempt
@@ -135,8 +144,9 @@ class RoutingService:
             path=self._build_polyline(
                 result.edges, (origin_lat, origin_lon), (dest_lat, dest_lon)
             ),
-            instructions=build_instructions(result.edges, destination_name,
-                                            self.graph, mode_bit),
+            instructions=build_instructions(
+                result.edges, destination_name, self.graph, mode_bit, heading,
+                self._approach_m(result.edges, origin_lat, origin_lon)),
             snap={
                 "origin_m": round(origin.distance_m, 1),
                 "destination_m": round(destination.distance_m, 1),
@@ -350,6 +360,32 @@ class RoutingService:
         if not found:
             raise SnapError(which, self._diagnostic_distance(lat, lon, mode_bit))
         return found
+
+    @staticmethod
+    def _facing(weight_fn, overlay, source, heading: Optional[float], penalty: float):
+        """Charge a turn-around for setting off against the traveller's heading.
+
+        A reroute from someone already moving would otherwise send them back the
+        way they came whenever that is marginally quicker on paper, without
+        telling them to turn around first.
+        """
+        if heading is None:
+            return weight_fn
+        behind = {id(edge) for edge in overlay.neighbours(source)
+                  if abs(heading_change(heading, edge)) >= TURN_AROUND_DEG}
+        if not behind:
+            return weight_fn
+
+        def facing(edge) -> float:
+            cost = weight_fn(edge)
+            return cost + penalty if id(edge) in behind else cost
+        return facing
+
+    @staticmethod
+    def _approach_m(edges: Sequence, origin_lat: float, origin_lon: float) -> float:
+        """Length of the drawn path's first leg, from the traveller onto the road."""
+        start = edges[0].geometry[0]
+        return haversine_m(origin_lat, origin_lon, start[0], start[1])
 
     @staticmethod
     def _attempts(origins: list, destinations: list):

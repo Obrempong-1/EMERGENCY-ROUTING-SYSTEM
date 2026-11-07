@@ -72,6 +72,7 @@ export function useRouting(transportMode: TransportMode, trafficLevel: TrafficLe
         start: Coords,
         destination: Destination,
         silent = false,
+        heading: number | null = null,
     ) => {
         if (!silent) dispatch({ type: "start" });
         try {
@@ -84,6 +85,7 @@ export function useRouting(transportMode: TransportMode, trafficLevel: TrafficLe
                 transport_mode: transportMode,
                 traffic_level: trafficLevel,
                 destination_name: destination.name ?? null,
+                heading,
             });
             dispatch({ type: "resolved", route: data, at: Date.now() });
         } catch (err) {

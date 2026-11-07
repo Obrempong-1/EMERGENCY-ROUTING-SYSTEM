@@ -186,6 +186,62 @@ class TestPlan(unittest.TestCase):
         heavy = self.service.plan(*args, transport_mode="walk", traffic_level="heavy")
         self.assertEqual(normal.time_min, heavy.time_min)
 
+LOOP = {
+    1: (6.6740, -1.5730),
+    2: (6.6740, -1.5700),
+    3: (6.6760, -1.5700),
+    4: (6.6760, -1.5730),
+}
+
+def build_loop() -> RoutingService:
+    """A block of four two-way roads, so most trips can go either way round."""
+    graph = RouteGraph()
+    for node_id, (lat, lon) in LOOP.items():
+        graph.add_node(node_id, lat, lon)
+    for (tail, head), name in {(1, 2): "South Road", (2, 3): "East Road",
+                               (3, 4): "North Road", (4, 1): "West Road"}.items():
+        _edge(graph, tail, head, "residential", name, DRIVE | BIKE | WALK)
+        _edge(graph, head, tail, "residential", name, DRIVE | BIKE | WALK)
+    return RoutingService(graph)
+
+class TestHeading(unittest.TestCase):
+    """A traveller already moving is not sent back the way they came unannounced."""
+
+    ORIGIN = (6.6740, -1.5714)
+    TOP = (6.6760, -1.5715)
+
+    def setUp(self):
+        self.service = build_loop()
+
+    def _first(self, plan):
+        return plan.instructions[0]
+
+    def test_without_a_heading_the_marginally_shorter_way_wins(self):
+        plan = self.service.plan(*self.ORIGIN, *self.TOP)
+        self.assertEqual(self._first(plan)["road"], "South Road")
+        self.assertIn("east", self._first(plan)["text"])
+
+    def test_a_heading_keeps_the_traveller_going_forward(self):
+        plan = self.service.plan(*self.ORIGIN, *self.TOP, heading=270.0)
+        self.assertEqual(self._first(plan)["kind"], "depart")
+        self.assertIn("west", self._first(plan)["text"])
+
+    def test_turning_around_is_always_said_when_the_route_needs_it(self):
+        plan = self.service.plan(*self.ORIGIN, 6.6741, -1.5701, heading=270.0)
+        kinds = [step["kind"] for step in plan.instructions]
+        self.assertIn("uturn", kinds)
+        if kinds[0] == "depart":
+            self.assertIn("west", self._first(plan)["text"])
+
+    def test_step_positions_match_the_drawn_path(self):
+        plan = self.service.plan(*self.ORIGIN, *self.TOP, heading=270.0)
+        along = [0.0]
+        for (lat1, lon1), (lat2, lon2) in zip(plan.path, plan.path[1:]):
+            along.append(along[-1] + haversine_m(lat1, lon1, lat2, lon2))
+        for step in plan.instructions:
+            vertex = plan.path.index(step["location"])
+            self.assertAlmostEqual(step["at_m"], along[vertex], delta=1.0)
+
 class TestNearestFacilities(unittest.TestCase):
     def setUp(self):
         self.service = build_service()

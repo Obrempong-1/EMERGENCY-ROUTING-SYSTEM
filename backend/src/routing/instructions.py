@@ -11,12 +11,18 @@ from dataclasses import dataclass
 from math import atan2, cos, degrees, radians, sin
 from typing import Optional
 
+from .graph import haversine_m
+
 _STRAIGHT_DEG = 20.0
 _SLIGHT_DEG = 45.0
 _SHARP_DEG = 120.0
 _UTURN_DEG = 160.0
 
+TURN_AROUND_DEG = 150.0
+
 _CONNECTOR_MAX_M = 40.0
+
+_BEARING_SPAN_M = 20.0
 
 _COMPASS = ("north", "north-east", "east", "south-east",
             "south", "south-west", "west", "north-west")
@@ -39,32 +45,49 @@ def bearing(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return (degrees(atan2(y, x)) + 360.0) % 360.0
 
 def build_instructions(edges: list, destination_name: Optional[str] = None,
-                       graph=None, mode_bit: Optional[int] = None) -> list:
-    """Group edges into navigation steps of {text, kind, distance_m, road}.
+                       graph=None, mode_bit: Optional[int] = None,
+                       heading: Optional[float] = None, offset_m: float = 0.0) -> list:
+    """Group edges into steps of {text, kind, distance_m, road, location, at_m}.
 
-    With `graph` and `mode_bit`, roundabout steps name the exit to take.
+    With `graph` and `mode_bit`, roundabout steps name the exit to take and a bend
+    with no other way on is not announced as a turn. With `heading`, the
+    traveller's direction of travel in degrees, the first step says which way to
+    turn, or to turn around, instead of only a compass point. `location` is where
+    a step's manoeuvre happens and `at_m` how far along the route that is,
+    counting `offset_m` of approach before the first edge.
     """
     if not edges:
         return []
 
     names = _effective_names(edges)
-    steps = [_step(manoeuvre) for manoeuvre in _manoeuvres(edges, names, graph, mode_bit)]
+    steps = []
+    travelled = offset_m
+    for manoeuvre in _manoeuvres(edges, names, graph, mode_bit, heading):
+        step = _step(manoeuvre)
+        start = manoeuvre.edges[0].geometry[0]
+        step["location"] = [start[0], start[1]]
+        step["at_m"] = round(travelled, 1)
+        travelled += sum(edge.length_m for edge in manoeuvre.edges)
+        steps.append(step)
+
+    end = edges[-1].geometry[-1]
     steps.append({
         "text": f"Arrive at {destination_name}" if destination_name else "Arrive at your destination",
         "kind": "arrive",
         "distance_m": 0,
         "road": steps[-1]["road"],
+        "location": [end[0], end[1]],
+        "at_m": round(travelled, 1),
     })
     return steps
 
-def _manoeuvres(edges: list, names: list, graph, mode_bit) -> list:
+def heading_change(heading: float, edge) -> float:
+    """Signed degrees from a direction of travel onto an edge: negative is left."""
+    return _signed_turn(heading, _entry_bearing(edge))
+
+def _manoeuvres(edges: list, names: list, graph, mode_bit, heading) -> list:
     """Detect and classify each manoeuvre along the route."""
-    first = Manoeuvre(
-        kind="depart",
-        phrase=f"Head {_compass_point(_entry_bearing(edges[0]))} on",
-        edges=[edges[0]],
-    )
-    found = [first]
+    found = [_departure(edges[0], heading)]
     index = 1
 
     while index < len(edges):
@@ -87,6 +110,8 @@ def _manoeuvres(edges: list, names: list, graph, mode_bit) -> list:
             continue
 
         phrase, kind = _classify(_signed_turn(_exit_bearing(previous), _entry_bearing(edge)))
+        if kind not in ("straight", "uturn") and not _is_choice(previous, edge, graph, mode_bit):
+            kind = "straight"
         current = found[-1]
         if kind == "straight" and not current.edges[-1].roundabout and _same_road(
                 current.edges[-1], edge, names[index - 1], names[index]):
@@ -98,6 +123,38 @@ def _manoeuvres(edges: list, names: list, graph, mode_bit) -> list:
         index += 1
 
     return found
+
+def _departure(edge, heading: Optional[float]) -> Manoeuvre:
+    """The first step, turned relative to the traveller when their heading is known."""
+    compass = _compass_point(_entry_bearing(edge))
+    if heading is not None:
+        turn = heading_change(heading, edge)
+        if abs(turn) >= TURN_AROUND_DEG:
+            return Manoeuvre(kind="uturn", phrase=f"Turn around and head {compass} on",
+                             edges=[edge])
+        if abs(turn) >= _SLIGHT_DEG:
+            phrase, kind = _classify(turn)
+            return Manoeuvre(kind=kind, phrase=f"{phrase} onto", edges=[edge])
+    return Manoeuvre(kind="depart", phrase=f"Head {compass} on", edges=[edge])
+
+def _is_choice(previous, edge, graph, mode_bit) -> bool:
+    """Whether the junction offers more than one way on.
+
+    Where the road is the only way forward, a bend there is not a turn anyone can
+    get wrong, so it is not announced as one. Going back the way the traveller
+    came is not an option. Without a graph every junction counts as a choice.
+    """
+    if graph is None or mode_bit is None:
+        return True
+    arriving = _exit_bearing(previous)
+    ways_on = 0
+    for out in graph.neighbours(edge.from_node):
+        if not out.allowed & mode_bit or out.to_node == previous.from_node:
+            continue
+        if abs(_signed_turn(arriving, _entry_bearing(out))) >= _UTURN_DEG:
+            continue
+        ways_on += 1
+    return ways_on > 1
 
 def _step(manoeuvre: Manoeuvre) -> dict:
     last = manoeuvre.edges[-1]
@@ -179,20 +236,34 @@ def _classify(turn: float) -> tuple[str, str]:
     return "Continue straight", "straight"
 
 def _entry_bearing(edge) -> float:
-    geometry = edge.geometry
-    start = geometry[0]
-    for point in geometry[1:]:
-        if point != start:
-            return bearing(start[0], start[1], point[0], point[1])
-    return 0.0
+    start = edge.geometry[0]
+    ahead = _point_along(edge.geometry)
+    if ahead == start:
+        return 0.0
+    return bearing(start[0], start[1], ahead[0], ahead[1])
 
 def _exit_bearing(edge) -> float:
-    geometry = edge.geometry
-    end = geometry[-1]
-    for point in reversed(geometry[:-1]):
-        if point != end:
-            return bearing(point[0], point[1], end[0], end[1])
-    return 0.0
+    end = edge.geometry[-1]
+    behind = _point_along(tuple(reversed(edge.geometry)))
+    if behind == end:
+        return 0.0
+    return bearing(behind[0], behind[1], end[0], end[1])
+
+def _point_along(points, span_m: float = _BEARING_SPAN_M) -> tuple:
+    """The point `span_m` along a polyline, or its far end when it is shorter.
+
+    A road's direction at a junction is read over this stretch rather than from
+    its last vertex pair, so a few metres of kink or overshoot in the OSM drawing
+    cannot flip a left turn into a right one.
+    """
+    travelled = 0.0
+    for a, b in zip(points, points[1:]):
+        step = haversine_m(a[0], a[1], b[0], b[1])
+        if step > 0 and travelled + step >= span_m:
+            share = (span_m - travelled) / step
+            return (a[0] + (b[0] - a[0]) * share, a[1] + (b[1] - a[1]) * share)
+        travelled += step
+    return points[-1]
 
 def _road_label(edge) -> str:
     if edge.name:

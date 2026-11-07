@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 
 import type { RouteResponse, RouteStep, TrafficLevel, TransportMode } from "../lib/api";
+import { actionOf, cueFor, THRESHOLDS, type Progress } from "../lib/navigation";
 import { useVoiceGuidance } from "../lib/useVoiceGuidance";
 
 const MODE_LABEL: Record<TransportMode, string> = {
@@ -50,24 +51,9 @@ const MANOEUVRE: Record<string, LucideIcon> = {
     arrive: Flag,
 };
 
-const NEAR_M = 40;
-
-function actionOf(step: RouteStep | undefined): string {
-    if (!step) return "";
-    return step.text.replace(/\s+for\s+[\d.]+\s*k?m$/i, "");
-}
-
 function distanceLabel(metres: number): string {
     if (metres >= 1000) return `${(metres / 1000).toFixed(1)} km`;
     return `${Math.max(0, Math.round(metres / 10) * 10)} m`;
-}
-
-function spokenDistance(metres: number): string {
-    if (metres >= 1000) {
-        const km = (metres / 1000).toFixed(1);
-        return `${km} kilometre${km === "1.0" ? "" : "s"}`;
-    }
-    return `${Math.max(10, Math.round(metres / 10) * 10)} metres`;
 }
 
 interface RouteAnalysisProps {
@@ -75,6 +61,7 @@ interface RouteAnalysisProps {
     transportMode: TransportMode;
     trafficLevel: TrafficLevel;
     navigating: boolean;
+    progress: Progress | null;
     inline: boolean;
     hidden: boolean;
     top: number;
@@ -82,23 +69,19 @@ interface RouteAnalysisProps {
 }
 
 export default function RouteAnalysis({
-    route, transportMode, trafficLevel, navigating, inline, hidden, top, maxHeight,
+    route, transportMode, trafficLevel, navigating, progress, inline, hidden, top, maxHeight,
 }: RouteAnalysisProps) {
     const [open, setOpen] = useState(false);
 
     const steps = route?.instructions ?? [];
-    const arriving = steps.length <= 1;
-    const next = arriving ? steps[0] : steps[1];
-    const toNext = arriving ? 0 : (steps[0]?.distance_m ?? 0);
+    const nextIndex = progress?.nextIndex ?? Math.min(1, steps.length - 1);
+    const next = steps[nextIndex];
+    const toNext = progress?.toNext ?? next?.at_m ?? 0;
     const action = actionOf(next);
-    const near = toNext <= NEAR_M;
-    const phrase = !action
-        ? ""
-        : next?.kind === "arrive" || near
-            ? action
-            : `In ${spokenDistance(toNext)}, ${action.charAt(0).toLowerCase()}${action.slice(1)}`;
+    const near = toNext <= THRESHOLDS[transportMode].now;
+    const cue = navigating && route && progress ? cueFor(route, progress, transportMode) : null;
 
-    const voice = useVoiceGuidance(navigating ? phrase : "", navigating && Boolean(route));
+    const voice = useVoiceGuidance(cue, navigating && Boolean(route));
 
     if (!route || hidden) return null;
 
@@ -144,9 +127,11 @@ export default function RouteAnalysis({
                             </span>
                         )}
                         <span className="mt-0.5 block truncate text-[11px] text-slate-400">
-                            {navigating
-                                ? `${route.distance_km} km · ${steps.length} ${steps.length === 1 ? "step" : "steps"}`
-                                : `${steps.length} ${steps.length === 1 ? "step" : "steps"}`}
+                            {navigating && progress
+                                ? `${distanceLabel(progress.remaining)} to go`
+                                : navigating
+                                    ? `${route.distance_km} km · ${steps.length} ${steps.length === 1 ? "step" : "steps"}`
+                                    : `${steps.length} ${steps.length === 1 ? "step" : "steps"}`}
                             {congested ? " · heavy traffic" : ""}
                         </span>
                     </button>

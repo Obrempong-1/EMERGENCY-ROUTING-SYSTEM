@@ -6,6 +6,8 @@ import Link from "next/link";
 import {
     ChevronLeft,
     ChevronRight,
+    LogIn,
+    LogOut,
     MapPin,
     MapPinPlus,
     PanelLeftOpen,
@@ -31,15 +33,21 @@ import {
     useCoverage,
     useIncidents,
     useLocations,
+    useLogout,
     useModeEtas,
     useSession,
 } from "../lib/queries";
+import { supabaseConfigured } from "../lib/supabase";
 import { useRouting } from "../lib/useRouting";
 import { useUserLocation } from "../lib/useUserLocation";
+import { useNavigation } from "../lib/useNavigation";
+import { useCompass } from "../lib/useCompass";
+import { THRESHOLDS } from "../lib/navigation";
 import SidebarHeader from "../components/sidebar/SidebarHeader";
 import { RouteStops } from "../components/sidebar/RouteConfig";
 import PlacePicker from "../components/sidebar/PlacePicker";
 import CreatorFooter from "../components/sidebar/CreatorFooter";
+import AccountRow from "../components/sidebar/AccountRow";
 import BottomSheet, { type SheetSnap } from "../components/BottomSheet";
 import EmergencyPicker from "../components/sidebar/EmergencyPicker";
 import PinPlaceDialog from "../components/PinPlaceDialog";
@@ -55,7 +63,6 @@ import { RouteSummary } from "../components/phone/RouteSummary";
 import { useIsDesktop } from "../lib/useBreakpoint";
 import { can } from "../lib/roles";
 import RoleIntroCard from "../components/RoleIntroCard";
-import { metresBetween } from "../lib/geo";
 import { styleFor } from "../components/map/categories";
 import { scopeCategories, type CoverageScope } from "../components/map/coverage";
 
@@ -65,7 +72,9 @@ const CURRENT_LOCATION = "__current_location__";
 
 type PhoneView = "home" | "more" | "search" | "directions";
 
-const REROUTE_THRESHOLD_M = 20;
+const REROUTE_AFTER_FIXES = 2;
+const REROUTE_GAP_MS = 5000;
+const ACCURACY_ALLOWANCE_M = 30;
 
 export default function Home() {
     const locationsQuery = useLocations();
@@ -103,7 +112,8 @@ export default function Home() {
 
     const [centreOn, setCentreOn] = useState<{ lat: number; lon: number } | null>(null);
     const collapsedFor = useRef("");
-    const plannedFrom = useRef<{ lat: number; lon: number } | null>(null);
+    const offRouteFixes = useRef(0);
+    const lastReroute = useRef(0);
     const originRef = useRef<{ lat: number; lon: number } | null>(null);
     const [pinPoint, setPinPoint] = useState<{ lat: number; lon: number } | null>(null);
     const [pinOpen, setPinOpen] = useState(false);
@@ -117,7 +127,11 @@ export default function Home() {
 
     const { destinationId, route, computedAt, loading, error } = routing;
     const { plan, choose, clear, fail } = routing;
-    const { location: userLocation, setTracking: setGpsTracking } = gps;
+    const { location: userLocation, setTracking: setGpsTracking, currentHeading } = gps;
+
+    const compass = useCompass(userLocation !== null);
+    const { request: requestCompass } = compass;
+    const pointerHeading = gps.travelHeading ?? compass.heading;
 
     const gpsFailed = gps.status === "denied"
         || gps.status === "unavailable"
@@ -135,30 +149,43 @@ export default function Home() {
 
     const useMyLocation = useCallback(() => {
         setOriginId(CURRENT_LOCATION);
+        void requestCompass();
         if (!gps.location) gps.request();
-    }, [gps]);
+    }, [gps, requestCompass]);
 
     const centreOnMe = useCallback(() => {
+        void requestCompass();
         if (gps.location) setCentreOn({ ...gps.location });
         else gps.request();
-    }, [gps]);
+    }, [gps, requestCompass]);
 
     useEffect(() => {
         if (!isDesktop && userLocation) setGpsTracking(true);
     }, [isDesktop, userLocation, setGpsTracking]);
 
+    const navigating = gps.watching && usingGps;
+    const navigation = useNavigation(route, userLocation, navigating, currentHeading);
+
     useEffect(() => {
-        if (!gps.watching || !usingGps || !userLocation || !destinationId) return;
+        if (!navigating || !navigation || !userLocation || !destinationId) {
+            offRouteFixes.current = 0;
+            return;
+        }
         const end = byId.get(destinationId);
         if (!end) return;
-        const previous = plannedFrom.current;
-        if (previous && metresBetween(previous, userLocation) < REROUTE_THRESHOLD_M) return;
-        const timer = setTimeout(() => {
-            plannedFrom.current = userLocation;
-            plan(userLocation, end, true);
-        }, 1000);
-        return () => clearTimeout(timer);
-    }, [gps.watching, usingGps, userLocation, destinationId, byId, plan]);
+        const allowance = Math.min(gps.accuracy ?? 0, ACCURACY_ALLOWANCE_M);
+        if (navigation.offRoute <= THRESHOLDS[transportMode].offRoute + allowance) {
+            offRouteFixes.current = 0;
+            return;
+        }
+        offRouteFixes.current += 1;
+        if (offRouteFixes.current < REROUTE_AFTER_FIXES
+            || Date.now() - lastReroute.current < REROUTE_GAP_MS) return;
+        offRouteFixes.current = 0;
+        lastReroute.current = Date.now();
+        plan(userLocation, end, true, currentHeading());
+    }, [navigating, navigation, userLocation, destinationId, byId, plan, transportMode,
+        gps.accuracy, currentHeading]);
 
     const origin = resolveOrigin();
     useEffect(() => { originRef.current = origin; }, [origin]);
@@ -171,7 +198,7 @@ export default function Home() {
         const timer = setTimeout(async () => {
             const start = originRef.current;
             if (!start) return;
-            await plan(start, end);
+            await plan(start, end, false, usingGps ? currentHeading() : null);
             if (collapsedFor.current !== destinationId) {
                 collapsedFor.current = destinationId;
                 setSheetSnap("rest");
@@ -180,12 +207,11 @@ export default function Home() {
             }
         }, 200);
         return () => clearTimeout(timer);
-    }, [hasOrigin, startId, destinationId, byId, plan]);
+    }, [hasOrigin, startId, destinationId, byId, plan, usingGps, currentHeading]);
 
     const goTo = useCallback((place: MapMarker) => {
         choose(place.id);
         setSheetSnap("rest");
-        plannedFrom.current = null;
         if (!isDesktop) setOriginId(CURRENT_LOCATION);
         if (!resolveOrigin()) {
             gps.request();
@@ -253,6 +279,11 @@ export default function Home() {
                                  traffic);
     const sessionQuery = useSession();
     const sessionRoles = sessionQuery.data?.roles;
+    const student = sessionQuery.data ?? null;
+    const sessionPending = sessionQuery.isPending;
+    const logout = useLogout();
+    const signOut = logout.mutate;
+    const signingOut = logout.isPending;
     const canAddPlaces = can(sessionRoles, "add_places");
     const canResolve = can(sessionRoles, "resolve_incidents");
     const isAdmin = can(sessionRoles, "manage_roles");
@@ -335,8 +366,24 @@ export default function Home() {
                 hint: "Roles and added places", href: "/admin",
             });
         }
+        if (student) {
+            rows.push({
+                id: "sign-out", label: signingOut ? "Signing out..." : "Sign out", Icon: LogOut,
+                hint: student.email,
+                onSelect: () => {
+                    signOut();
+                    setPhoneView("home");
+                },
+            });
+        } else if (supabaseConfigured && !sessionPending) {
+            rows.push({
+                id: "sign-in", label: "Sign in", Icon: LogIn,
+                hint: "Needed to report incidents", href: "/login",
+            });
+        }
         return rows;
-    }, [coverageActive, otherCategories, canAddPlaces, canResolve, isAdmin, pickCategory]);
+    }, [coverageActive, otherCategories, canAddPlaces, canResolve, isAdmin, pickCategory,
+        student, sessionPending, signOut, signingOut]);
 
     const panel = (
         <div className="flex h-full min-h-0 flex-1 flex-col">
@@ -443,6 +490,8 @@ export default function Home() {
                         <ChevronRight size={16} className="shrink-0 text-slate-400" />
                     </Link>
                 )}
+
+                <AccountRow />
             </div>
             {isDesktop && (
                 <div className="border-t border-slate-100 pt-3">
@@ -641,7 +690,8 @@ export default function Home() {
                         route={route}
                         transportMode={transportMode}
                         trafficLevel={trafficLevel}
-                        navigating={gps.watching && usingGps}
+                        navigating={navigating}
+                        progress={navigation}
                         inline={isDesktop}
                         hidden={!isDesktop && mapMoving}
                         top={topBarBottom + 8}
@@ -680,6 +730,8 @@ export default function Home() {
                     incidents={incidentsQuery.data?.incidents ?? []}
                     onReportIncident={() => setReportOpen(true)}
                     onUserMove={setMapMoving}
+                    userHeading={pointerHeading}
+                    userAccuracy={gps.accuracy}
                     topBarBottom={isDesktop ? 0 : topBarBottom}
                     sheetBottom={sheetBottom}
                     onContactsOpen={() => setSheetSnap("rest")}

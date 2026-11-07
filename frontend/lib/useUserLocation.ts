@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { bearingBetween, metresBetween } from "./geo";
+
 export interface Coords {
     lat: number;
     lon: number;
@@ -30,6 +32,11 @@ const GEO_OPTIONS: PositionOptions = {
 
 const AUTO_REQUEST_DELAY_MS = 500;
 
+const MOVING_MPS = 0.8;
+const HEADING_BASELINE_M = 8;
+const HEADING_FRESH_MS = 20_000;
+const TRAVEL_HOLD_MS = 5_000;
+
 const MESSAGES: Record<LocationStatus, string> = {
     idle: "",
     locating: "",
@@ -44,8 +51,12 @@ export function useUserLocation(bounds: ServiceBounds, auto: boolean) {
     const [firstFix, setFirstFix] = useState<Coords | null>(null);
     const [status, setStatus] = useState<LocationStatus>("idle");
     const [watching, setWatching] = useState(false);
+    const heading = useRef<{ degrees: number; at: number } | null>(null);
+    const [travelHeading, setTravelHeading] = useState<number | null>(null);
+    const [accuracy, setAccuracy] = useState<number | null>(null);
 
     const watchId = useRef<number | null>(null);
+    const lastMoved = useRef<Coords | null>(null);
     const boundsRef = useRef<ServiceBounds>(bounds);
     const asked = useRef(false);
 
@@ -68,6 +79,26 @@ export function useUserLocation(bounds: ServiceBounds, auto: boolean) {
         setWatching(false);
     }, []);
 
+    const track = useCallback((coords: GeolocationCoordinates, here: Coords) => {
+        const moving = (degrees: number) => {
+            heading.current = { degrees, at: Date.now() };
+            lastMoved.current = here;
+            setTravelHeading(degrees);
+        };
+        const reported = coords.heading;
+        const from = lastMoved.current;
+        if (reported !== null && Number.isFinite(reported)
+                && coords.speed !== null && coords.speed >= MOVING_MPS) {
+            moving(reported);
+        } else if (!from) {
+            lastMoved.current = here;
+        } else if (metresBetween(from, here) >= HEADING_BASELINE_M) {
+            moving(bearingBetween(from, here));
+        } else if (!heading.current || Date.now() - heading.current.at > TRAVEL_HOLD_MS) {
+            setTravelHeading(null);
+        }
+    }, []);
+
     const accept = useCallback((position: GeolocationPosition) => {
         const { latitude: lat, longitude: lon } = position.coords;
         if (!inside(lat, lon)) {
@@ -76,10 +107,18 @@ export function useUserLocation(bounds: ServiceBounds, auto: boolean) {
             stopWatching();
             return;
         }
+        track(position.coords, { lat, lon });
+        setAccuracy(position.coords.accuracy);
         setLocation({ lat, lon });
         setFirstFix((previous) => previous ?? { lat, lon });
         setStatus("ready");
-    }, [inside, stopWatching]);
+    }, [inside, stopWatching, track]);
+
+    const currentHeading = useCallback((): number | null => {
+        const known = heading.current;
+        if (!known || Date.now() - known.at > HEADING_FRESH_MS) return null;
+        return known.degrees;
+    }, []);
 
     const reject = useCallback((error: GeolocationPositionError) => {
         setStatus(error.code === error.PERMISSION_DENIED ? "denied" : "unavailable");
@@ -130,6 +169,9 @@ export function useUserLocation(bounds: ServiceBounds, auto: boolean) {
 
     return {
         location,
+        currentHeading,
+        travelHeading,
+        accuracy,
         firstFix,
         status,
         message: MESSAGES[status],

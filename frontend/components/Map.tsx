@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useRef, useState } from 'react';
-import { MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from 'react-leaflet';
+import { Circle, MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { AlertTriangle, Layers, Locate, Minus, Navigation, Phone, Plus, Radar } from 'lucide-react';
@@ -13,7 +13,7 @@ import HelpButton from './map/HelpButton';
 import MapLegend from './MapLegend';
 import { styleFor } from './map/categories';
 import { CategoryGlyph, IncidentGlyph } from './map/CategoryGlyph';
-import { emergencyPin, facilityDot, incidentMarker, labelIcon, userPuck } from './map/markers';
+import { emergencyPin, facilityDot, incidentMarker, labelIcon, userPointer, userPuck } from './map/markers';
 import { useMapLabels } from './map/useMapLabels';
 import { useIsDesktop } from '@/lib/useBreakpoint';
 import MapTypeButton from './phone/MapTypeButton';
@@ -23,6 +23,8 @@ const CENTER: [number, number] = [6.6745, -1.5716];
 const CONTROLS_RETURN_MS = 700;
 const CONTROLS_WATCHDOG_MS = 2500;
 const FALLBACK_BOUNDS: L.LatLngBoundsExpression = [[6.65, -1.60], [6.72, -1.52]];
+const ACCURACY_SHOWN_FROM_M = 8;
+const ACCURACY_SHOWN_UNTIL_M = 500;
 
 const BASEMAPS = {
     satellite: {
@@ -54,6 +56,8 @@ interface MapContentProps {
     insetTop: number;
     insetBottom: number;
     onUserMove?: (moving: boolean) => void;
+    userHeading: number | null;
+    userAccuracy: number | null;
 }
 
 function MapContent({
@@ -71,8 +75,35 @@ function MapContent({
     insetTop,
     insetBottom,
     onUserMove,
+    userHeading,
+    userAccuracy,
 }: MapContentProps) {
     const map = useMap();
+
+    const userMarker = useRef<L.Marker | null>(null);
+    const shownAngle = useRef<number | null>(null);
+    const pointing = userHeading !== null;
+    useEffect(() => {
+        const element = userMarker.current?.getElement()
+            ?.querySelector<HTMLElement>('.knust-puck__dir');
+        if (!element || userHeading === null) {
+            shownAngle.current = null;
+            return;
+        }
+        const previous = shownAngle.current;
+        const angle = previous === null
+            ? userHeading
+            : previous + ((((userHeading - previous) % 360) + 540) % 360) - 180;
+        shownAngle.current = angle;
+        if (previous === null) {
+            element.style.transition = 'none';
+            element.style.transform = `rotate(${angle}deg)`;
+            void element.offsetWidth;
+            element.style.transition = '';
+        } else {
+            element.style.transform = `rotate(${angle}deg)`;
+        }
+    }, [userHeading, pointing]);
 
     const insets = useRef({ top: 0, bottom: 0 });
     const programmatic = useRef(false);
@@ -219,13 +250,27 @@ function MapContent({
                 const usesPin = isUser || isEmergency || isActive;
 
                 let icon: L.DivIcon;
-                if (isUser) icon = userPuck();
+                if (isUser) icon = pointing ? userPointer() : userPuck();
                 else if (isEmergency || isActive) icon = emergencyPin(marker.category, isActive);
                 else icon = facilityDot(isActive);
 
                 return (
                     <Fragment key={marker.id}>
+                        {isUser && userAccuracy !== null
+                            && userAccuracy >= ACCURACY_SHOWN_FROM_M
+                            && userAccuracy <= ACCURACY_SHOWN_UNTIL_M && (
+                            <Circle
+                                center={[marker.lat, marker.lon]}
+                                radius={userAccuracy}
+                                interactive={false}
+                                pathOptions={{
+                                    color: '#2563eb', weight: 1, opacity: 0.35,
+                                    fillColor: '#2563eb', fillOpacity: 0.1,
+                                }}
+                            />
+                        )}
                         <Marker
+                            ref={isUser ? userMarker : undefined}
                             position={[marker.lat, marker.lon]}
                             icon={icon}
                             zIndexOffset={isActive ? 1200 : isUser ? 1000 : isEmergency ? 500 : 0}
@@ -389,6 +434,8 @@ interface MapComponentProps {
     sheetBottom: number;
     onUserMove?: (moving: boolean) => void;
     onContactsOpen?: () => void;
+    userHeading?: number | null;
+    userAccuracy?: number | null;
 }
 
 export default function MapComponent({
@@ -416,6 +463,8 @@ export default function MapComponent({
     sheetBottom,
     onUserMove,
     onContactsOpen,
+    userHeading = null,
+    userAccuracy = null,
 }: MapComponentProps) {
     const [map, setMap] = useState<L.Map | null>(null);
     const [basemap, setBasemap] = useState<BasemapKey>('satellite');
@@ -510,6 +559,8 @@ export default function MapComponent({
                     insetTop={topBarBottom}
                     insetBottom={sheetBottom}
                     onUserMove={onUserMove}
+                    userHeading={userHeading}
+                    userAccuracy={userAccuracy}
                 />
             </MapContainer>
 

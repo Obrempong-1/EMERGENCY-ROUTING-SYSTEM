@@ -182,6 +182,7 @@ class RouteRequest(BaseModel):
     traffic_level: TrafficLevel = "normal"
     algorithm: Algorithm = "astar"
     destination_name: Optional[str] = Field(default=None, max_length=200)
+    heading: Optional[float] = Field(default=None, ge=0, le=360)
 
 class NearestRequest(BaseModel):
     lat: float = Field(..., ge=-90, le=90)
@@ -267,6 +268,7 @@ def calculate_route(request: RouteRequest):
             algorithm=request.algorithm,
             destination_name=request.destination_name,
             hazards=current_hazards(),
+            heading=request.heading,
         )
     except SnapError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc

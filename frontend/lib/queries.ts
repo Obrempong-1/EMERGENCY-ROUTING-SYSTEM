@@ -12,6 +12,7 @@ import {
 import {
     api,
     FALLBACK_CONTACTS,
+    setActingRole,
     type CategorySummary,
     type CoverageResponse,
     type EmergencyContact,
@@ -234,10 +235,16 @@ export function useLogout() {
     const client = useQueryClient();
     return useMutation({
         mutationFn: async () => {
+            try {
+                await api.forget();
+            } catch {
+            }
+            setActingRole(null);
             await supabase().auth.signOut();
         },
         onSettled: () => {
             client.removeQueries({ queryKey: queryKeys.session });
+            client.invalidateQueries();
         },
     });
 }

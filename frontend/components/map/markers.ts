@@ -65,6 +65,33 @@ export function userPuck(): L.DivIcon {
     }));
 }
 
+const POINTER_SIZE = 72;
+
+const POINTER_SVG = `
+<svg width="${POINTER_SIZE}" height="${POINTER_SIZE}" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="knust-beam" cx="36" cy="36" r="34" gradientUnits="userSpaceOnUse">
+      <stop offset="0.25" stop-color="#2563eb" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#2563eb" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <path d="M36 36 L18 4.8 A36 36 0 0 1 54 4.8 Z" fill="url(#knust-beam)"/>
+  <circle cx="36" cy="36" r="11.5" fill="#fff"/>
+  <circle cx="36" cy="36" r="9" fill="#2563eb"/>
+  <path d="M36 29.2 L41.4 42 L36 39 L30.6 42 Z" fill="#fff" stroke="#fff"
+        stroke-width="0.8" stroke-linejoin="round"/>
+</svg>`.trim();
+
+export function userPointer(): L.DivIcon {
+    return cached('pointer', () => L.divIcon({
+        className: 'knust-puck',
+        html: `<span class="knust-puck__dir">${POINTER_SVG}</span>`,
+        iconSize: [POINTER_SIZE, POINTER_SIZE],
+        iconAnchor: [POINTER_SIZE / 2, POINTER_SIZE / 2],
+        popupAnchor: [0, -14],
+    }));
+}
+
 export function labelIcon(name: string, category: string, offsetY: number): L.DivIcon {
     const style = styleFor(category);
     const emphasis = style.emergency ? ' is-emphasis' : '';

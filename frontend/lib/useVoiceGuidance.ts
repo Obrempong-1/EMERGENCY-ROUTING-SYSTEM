@@ -2,7 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import type { Cue } from "./navigation";
+
 const STORAGE_KEY = "knust.voice-guidance";
+
+const URGENT_STAGE = 3;
 
 function supported(): boolean {
     return typeof window !== "undefined" && "speechSynthesis" in window;
@@ -24,48 +28,47 @@ function remember(on: boolean): void {
     }
 }
 
-export function useVoiceGuidance(phrase: string, active: boolean) {
+export function useVoiceGuidance(cue: Cue | null, active: boolean) {
     const [enabled, setEnabled] = useState<boolean>(stored);
-    const spoken = useRef("");
+    const reached = useRef(new Map<string, number>());
 
-    const say = useCallback((text: string) => {
+    const say = useCallback((text: string, urgent = true) => {
         if (!supported() || !text) return;
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.rate = 1.05;
         utterance.lang = "en-GB";
-        window.speechSynthesis.cancel();
+        if (urgent) window.speechSynthesis.cancel();
         window.speechSynthesis.speak(utterance);
     }, []);
 
     const toggle = useCallback(() => {
         const next = !enabled;
         if (next) {
-            spoken.current = phrase;
-            say(phrase || "Voice directions on");
+            if (cue) reached.current.set(cue.id, cue.stage);
+            say(cue?.text || "Voice directions on");
         } else if (supported()) {
             window.speechSynthesis.cancel();
-            spoken.current = "";
         }
         remember(next);
         setEnabled(next);
-    }, [enabled, phrase, say]);
+    }, [enabled, cue, say]);
+
+    const id = cue?.id;
+    const stage = cue?.stage;
+    const text = cue?.text;
 
     useEffect(() => {
-        if (!enabled || !active || !phrase) return;
-        if (phrase === spoken.current) return;
-        spoken.current = phrase;
-        say(phrase);
-    }, [enabled, active, phrase, say]);
+        if (!enabled || !active || id === undefined || stage === undefined || !text) return;
+        if (stage <= (reached.current.get(id) ?? -1)) return;
+        reached.current.set(id, stage);
+        say(text, stage === URGENT_STAGE);
+    }, [enabled, active, id, stage, text, say]);
 
     useEffect(() => {
-        if (active || !supported()) return;
-        window.speechSynthesis.cancel();
+        if (active) return;
+        reached.current.clear();
+        if (supported()) window.speechSynthesis.cancel();
     }, [active]);
-
-    useEffect(() => {
-        if (phrase) return;
-        spoken.current = "";
-    }, [phrase]);
 
     useEffect(() => () => {
         if (supported()) window.speechSynthesis.cancel();

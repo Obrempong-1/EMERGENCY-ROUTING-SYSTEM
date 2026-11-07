@@ -416,6 +416,77 @@ class TestInstructions(unittest.TestCase):
         self.assertEqual(kinds[-1], "arrive")
         self.assertIn("Great Hall", steps[-1]["text"])
 
+    def test_kink_at_junction_does_not_flip_the_turn(self):
+        overshoot = self._edge(((6.6700, -1.5700), (6.67103, -1.5700), (6.6710, -1.5700)),
+                               "First Street")
+        north_west = self._edge(((6.6710, -1.5700), (6.6715, -1.57087)), "Second Street")
+        steps = build_instructions([overshoot, north_west])
+        self.assertEqual(steps[1]["kind"], "turn-left")
+
+    def test_kink_leaving_a_junction_does_not_flip_the_turn(self):
+        north = self._edge(((6.6700, -1.5700), (6.6710, -1.5700)), "First Street")
+        stub = self._edge(((6.6710, -1.5700), (6.67100, -1.56997), (6.6710, -1.5710)),
+                          "Second Street")
+        steps = build_instructions([north, stub])
+        self.assertEqual(steps[1]["kind"], "turn-left")
+
+    def test_first_step_turns_relative_to_a_known_heading(self):
+        north = self._edge(((6.6700, -1.5700), (6.6710, -1.5700)), "First Street")
+        expected = {270.0: "turn-right", 90.0: "turn-left", 180.0: "uturn", 5.0: "depart"}
+        for heading, kind in expected.items():
+            steps = build_instructions([north], heading=heading)
+            self.assertEqual(steps[0]["kind"], kind, heading)
+        self.assertTrue(build_instructions([north], heading=180.0)[0]["text"]
+                        .startswith("Turn around and head north on First Street"))
+
+    def test_bend_with_no_other_way_on_is_not_a_turn(self):
+        g = RouteGraph()
+        for node, coords in {1: (6.6700, -1.5700), 2: (6.6710, -1.5700),
+                             3: (6.6710, -1.5690), 4: (6.6720, -1.5700)}.items():
+            g.add_node(node, *coords)
+
+        def road(tail, head, name):
+            edge = Edge(tail, head, 100.0, "residential", name, DRIVE | WALK | BIKE,
+                        {DRIVE: 14, BIKE: 24, WALK: 72}, (g.coords(tail), g.coords(head)))
+            g.add_edge(edge)
+            return edge
+
+        north = road(1, 2, "First Street")
+        road(2, 1, "First Street")
+        east = road(2, 3, "Second Street")
+        road(3, 2, "Second Street")
+        bend = [s["kind"] for s in build_instructions([north, east], graph=g, mode_bit=DRIVE)]
+        self.assertNotIn("turn-right", bend)
+        self.assertIn("continue", bend)
+
+        road(2, 4, "Third Street")
+        junction = [s["kind"] for s in build_instructions([north, east], graph=g, mode_bit=DRIVE)]
+        self.assertIn("turn-right", junction)
+
+    def test_a_u_turn_at_a_junction_is_always_announced(self):
+        g = RouteGraph()
+        for node, coords in {1: (6.6700, -1.5700), 2: (6.6710, -1.5700),
+                             3: (6.6710, -1.5690)}.items():
+            g.add_node(node, *coords)
+        out = Edge(1, 2, 100.0, "residential", "First Street", DRIVE,
+                   {DRIVE: 14, BIKE: 24, WALK: 72}, (g.coords(1), g.coords(2)))
+        back = Edge(2, 1, 100.0, "residential", "First Street", DRIVE,
+                    {DRIVE: 14, BIKE: 24, WALK: 72}, (g.coords(2), g.coords(1)))
+        for edge in (out, back, Edge(2, 3, 100.0, "residential", "Second Street", DRIVE,
+                                     {DRIVE: 14, BIKE: 24, WALK: 72},
+                                     (g.coords(2), g.coords(3)))):
+            g.add_edge(edge)
+        kinds = [s["kind"] for s in build_instructions([out, back], graph=g, mode_bit=DRIVE)]
+        self.assertIn("uturn", kinds)
+
+    def test_steps_say_where_along_the_route_each_manoeuvre_is(self):
+        north = self._edge(((6.6700, -1.5700), (6.6710, -1.5700)), "First Street", length=100)
+        east = self._edge(((6.6710, -1.5700), (6.6710, -1.5690)), "Second Street", length=150)
+        steps = build_instructions([north, east], offset_m=7.0)
+        self.assertEqual([s["at_m"] for s in steps], [7.0, 107.0, 257.0])
+        self.assertEqual(steps[1]["location"], [6.6710, -1.5700])
+        self.assertEqual(steps[-1]["location"], [6.6710, -1.5690])
+
     def test_straight_same_road_merges_into_one_step(self):
         a = self._edge(((6.6700, -1.5700), (6.6710, -1.5700)), "Long Road", length=100)
         b = self._edge(((6.6710, -1.5700), (6.6720, -1.5700)), "Long Road", length=150)

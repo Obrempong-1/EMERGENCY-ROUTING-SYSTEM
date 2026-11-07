@@ -133,6 +133,19 @@ body {
   z-index: 2;
 }
 
+.knust-puck__dir {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  transform-origin: 50% 50%;
+  transition: transform 0.35s ease-out;
+  filter: drop-shadow(0 1px 2px rgba(15, 23, 42, 0.35));
+}
+
+.knust-puck__dir svg {
+  display: block;
+}
+
 .knust-puck__pulse {
   position: absolute;
   top: 50%;
@@ -200,6 +213,10 @@ body {
   .knust-pin__inner,
   .knust-puck__pulse {
     animation: none;
+  }
+
+  .knust-puck__dir {
+    transition: none;
   }
 }
 
